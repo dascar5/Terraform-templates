@@ -87,7 +87,7 @@ resource "aws_lb_target_group" "main" {
 
 resource "aws_alb_listener" "http" {
   load_balancer_arn = aws_lb.main.id
-  port              = 5001
+  port              = 80
   protocol          = "HTTP"
  
   default_action {
