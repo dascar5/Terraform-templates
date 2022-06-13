@@ -1,0 +1,106 @@
+steps:
+  - checkout: none
+
+  - download: current
+    artifact: LDITransformArtifacts
+    name: download_transform
+
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: $(Pipeline.Workspace)/LDITransformArtifacts/deployment
+      includeRootFolder: false
+      archiveType: 'tar'
+      tarCompression: 'gz'
+      archiveFile: $(Pipeline.Workspace)/LDITransformArtifacts/deployment/deployment_package.tar.gz
+      verbose: True
+    displayName: 'Create Deploy Package'
+    name: archive
+
+  - task: AWSPowerShellModuleScript@1
+    inputs:
+      scriptType: 'inline'
+      regionName: 'us-east-1'
+      awsCredentials: 'LDI CI/CD Role'
+      inlineScript: |
+            $Build_Environment = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1]
+            If ($Build_Environment -ieq "main")
+            {
+              $Build_Environment = "prod"
+            }
+            Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true,isSecret=true]$Build_Environment")
+
+            $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS).SecretString | ConvertFrom-Json
+            $TF_Team = (Get-SECSecretValue -SecretID "/shared/tf_team/api" -Credential $STS_CREDS).SecretString | ConvertFrom-Json
+
+            $TF_Org_Key = $TF_Org.key
+            $TF_Team_Key = $TF_Team.key
+
+            $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Pipeline.Workspace)/LDITransformArtifacts/deployment/deployment_package.tar.gz" -Encoding byte))
+            $Payload ="{ ""workspace"": ""ldi-mult-desc-srch-process-$Build_Environment"", ""deploy_package"": ""$Encoded_Archive"", ""tf_org"": ""$TF_Org_Key"", ""tf_team"": ""$TF_Team_Key"" }"
+            
+            $EncodedPayloadBytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
+            $EncodedPayload = [System.Convert]::ToBase64String($EncodedPayloadBytes)
+            Write-Host ("##vso[task.setvariable variable=Payload;isOutput=true,isSecret=true]$EncodedPayload")
+    displayName: 'Payload - Gather'
+    name: set_payload
+
+  - task: AWSShellScript@1
+    inputs:
+      regionName: 'us-east-1'
+      scriptType: 'inline'
+      inlineScript: "aws lambda invoke --function-name lii-tf-handler-main --invocation-type Event --payload $PAYLOAD response.json"
+      awsCredentials: 'LDI CI/CD Role'
+    displayName: 'Invoke'
+    env:
+      PAYLOAD: $(Payload)
+      BUILD_ENVIRONMENT: $(Build_Environment)
+
+  - task: AWSPowerShellModuleScript@1
+    inputs:
+      scriptType: 'inline'
+      regionName: 'us-east-1'
+      awsCredentials: 'LDI CI/CD Role'
+      inlineScript: |
+            $Headers = @{
+                Authorization="Bearer $env:TF_TEAM"
+                ContentType="application/vnd.api+json"
+            }
+
+            $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/livingston-international/workspaces/ldi-mult-desc-srch-process-$env:BUILD_ENVIRONMENT" -Headers $Headers
+
+            If ($Response -ine $null)
+            {
+                $WS_ID = $Response.data.id
+            }
+            Else
+            {
+                Exit 1
+            }
+
+            If ($WS_ID -ine $null)
+            {
+                $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/workspaces/$WS_ID/runs" -Headers $Headers
+                $Run_ID = $Response.data.id[0]
+            }
+
+            Do{
+                $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/runs/$Run_ID" -Headers $Headers
+                $Run_Status = $Response.data.attributes.status
+                Start-Sleep -Seconds 15
+            } Until (($Run_Status -ieq "applied") -or ($Run_Status -ieq "errored") -or ($Run_Status -ieq "planned_and_finished"))
+
+            If ($Run_Status -ieq "errored")
+            {
+                Write-Host "TF Stage Failed - Retrieve Logs From Teams or Cloudwatch"
+                Exit 1
+            }
+            Else
+            {
+                Write-Host "TF Apply Succeeded - Moving Forward"
+                Exit 0
+            }
+    displayName: 'Await Status'
+    name: await_status
+    env:
+      TF_TEAM: $(TF_Team)
+      BUILD_ENVIRONMENT: $(Build_Environment)

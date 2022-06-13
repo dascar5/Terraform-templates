@@ -1,0 +1,11 @@
+env={environment}
+aws_region={aws_region}
+access_key={aws_access_key}
+secret_key={aws_secret_key}
+role_arn={aws_role_arn}
+vpcid={vpcid}
+vpce={vpce}
+subnet1={Data1}
+subnet2={Data2}
+bucket_id={bucket_id}
+imageuri={Image}

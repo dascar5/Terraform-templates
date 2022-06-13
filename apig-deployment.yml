@@ -1,0 +1,170 @@
+steps:
+  - checkout: self
+
+  - task: AWSPowerShellModuleScript@1
+    inputs:
+        regionName: 'us-east-1'
+        filePath: '$(Build.SourcesDirectory)/deployment/target_environment.ps1'
+        awsCredentials: 'LDI CI/CD Role'
+    displayName: 'Gather Environment Dependencies'
+    name: target
+
+  - task: AWSShellScript@1
+    inputs:
+      regionName: 'us-east-1'
+      scriptType: 'inline'
+      inlineScript: "aws apigateway put-rest-api --rest-api-id $Gateway_ID --mode overwrite --body fileb://$Build_SourcesDirectory/json-resolved/swagger.json"
+    displayName: 'Update Rest API'
+    env:
+      AWS_ACCESS_KEY_ID: $(AccessKey)
+      AWS_SECRET_ACCESS_KEY: $(SecretKey)
+      AWS_SESSION_TOKEN: $(SessionToken)
+      Build_SourcesDirectory: $(Build.SourcesDirectory)
+      Gateway_ID: $(Gateway_ID)
+
+  - task: AWSShellScript@1
+    inputs:
+      regionName: 'us-east-1'
+      scriptType: 'inline'
+      inlineScript: |
+        aws apigateway update-rest-api --rest-api-id $Gateway_ID --patch-operations op=replace,path=/policy,value=$(jq tostring $Build_SourcesDirectory/deployment/resource_policy/multi-desc-dev-resource-policy.yml)
+    displayName: 'Update Rest API Resource Policy - Private API'
+    env:
+      AWS_ACCESS_KEY_ID: $(AccessKey)
+      AWS_SECRET_ACCESS_KEY: $(SecretKey)
+      AWS_SESSION_TOKEN: $(SessionToken)
+      Build_SourcesDirectory: $(Build.SourcesDirectory)
+      Gateway_ID: $(Gateway_ID)
+
+  - task: AWSShellScript@1
+    inputs:
+      regionName: 'us-east-1'
+      scriptType: 'inline'
+      inlineScript: |
+        MSYS_NO_PATHCONV=1 aws apigateway create-deployment --rest-api-id $Gateway_ID --stage-name $Multi_ENV --variables environment=$Multi_ENV
+    displayName: 'Update Deployment Stage'
+    env:
+      AWS_ACCESS_KEY_ID: $(AccessKey)
+      AWS_SECRET_ACCESS_KEY: $(SecretKey)
+      AWS_SESSION_TOKEN: $(SessionToken)
+      Gateway_ID: $(Gateway_ID)
+      Multi_ENV: $(Multi_ENV)
+
+  - task: AWSPowerShellModuleScript@1
+    inputs:
+      regionName: 'us-east-1'
+      scriptType: 'inline'
+      inlineScript: |
+        Try
+        {
+          $ExistingPolicies =  Get-LMPolicy -FunctionName ${env:Function_Name_Input} -Select Policy -ErrorAction SilentlyContinue 
+        }
+        Catch
+        {
+          Write-Host "No Existing Policies Found - Continuing Execution"
+          $ExistingPolicies = $null
+        }
+
+        If ($ExistingPolicies -ine $null)
+        {
+          $ConvertedPolicies = $ExistingPolicies | ConvertFrom-Json | Select-Object -ExpandProperty Statement
+          Write-Host "Cleaning up expired statements:`n$ConvertedPolicies"
+
+          ForEach ($Policy in $ConvertedPolicies)
+          {
+            Remove-LMPermission -FunctionName ${env:Function_Name_Input} -StatementId $Policy.Sid -Force
+          }
+        }
+
+        $Function_Paths = Get-Content ${env:Build_SourcesDirectory}/json-resolved/swagger.json  | ConvertFrom-Json | Select-Object -ExpandProperty paths | Get-Member -MemberType Properties | Select-Object Name
+        ForEach ($Path in $Function_Paths.Name)
+        {
+          $Methods = $null
+          $rand = -join ((48..57) + (97..122) | Get-Random -Count 24 | % {[char]$_})
+
+          $Resources = Get-AGResourceList -RestApiId ${env:Gateway_ID}
+
+          ForEach ($Resource in $Resources)
+          {
+            If ($Resource.Path -ieq $Path)
+            {
+              $Methods = Get-AGResource -RestApiId ${env:Gateway_ID} -ResourceId $Resource.Id
+            }
+          }
+
+          If ($Methods -ine $null)
+          {
+            ForEach ($Method in $Methods)
+            {
+              ForEach ($Action in $Method.ResourceMethods)
+                {
+                  ForEach ($Call in $Action.Keys)
+                  {
+                    Add-LMPermission -FunctionName ${env:Function_Name_Input} -SourceArn "arn:aws:execute-api:us-east-1:${env:ARN}:${env:Gateway_ID}/${env:Multi_ENV}/$Call$Path" -Principal "apigateway.amazonaws.com" -Action "lambda:InvokeFunction" -StatementID "apig-$rand"
+                  }
+                }
+              }
+          }
+        }
+
+        Try
+        {
+          $ExistingPolicies =  Get-LMPolicy -FunctionName ${env:Function_Name_Output} -Select Policy -ErrorAction SilentlyContinue 
+        }
+        Catch
+        {
+          Write-Host "No Existing Policies Found - Continuing Execution"
+          $ExistingPolicies = $null
+        }
+
+        If ($ExistingPolicies -ine $null)
+        {
+          $ConvertedPolicies = $ExistingPolicies | ConvertFrom-Json | Select-Object -ExpandProperty Statement
+          Write-Host "Cleaning up expired statements:`n$ConvertedPolicies"
+
+          ForEach ($Policy in $ConvertedPolicies)
+          {
+            Remove-LMPermission -FunctionName ${env:Function_Name_Output} -StatementId $Policy.Sid -Force
+          }
+        }
+
+        $Function_Paths = Get-Content ${env:Build_SourcesDirectory}/json-resolved/swagger.json  | ConvertFrom-Json | Select-Object -ExpandProperty paths | Get-Member -MemberType Properties | Select-Object Name
+        ForEach ($Path in $Function_Paths.Name)
+        {
+          $Methods = $null
+          $rand = -join ((48..57) + (97..122) | Get-Random -Count 24 | % {[char]$_})
+
+          $Resources = Get-AGResourceList -RestApiId ${env:Gateway_ID}
+
+          ForEach ($Resource in $Resources)
+          {
+            If ($Resource.Path -ieq $Path)
+            {
+              $Methods = Get-AGResource -RestApiId ${env:Gateway_ID} -ResourceId $Resource.Id
+            }
+          }
+
+          If ($Methods -ine $null)
+          {
+            ForEach ($Method in $Methods)
+            {
+              ForEach ($Action in $Method.ResourceMethods)
+                {
+                  ForEach ($Call in $Action.Keys)
+                  {
+                    Add-LMPermission -FunctionName ${env:Function_Name_Output} -SourceArn "arn:aws:execute-api:us-east-1:${env:ARN}:${env:Gateway_ID}/${env:Multi_ENV}/$Call$Path" -Principal "apigateway.amazonaws.com" -Action "lambda:InvokeFunction" -StatementID "apig-$rand"
+                  }
+                }
+              }
+          }
+        }
+    displayName: 'Update Lambda Function Permissions'
+    env:
+      AWS_ACCESS_KEY_ID: $(AccessKey)
+      AWS_SECRET_ACCESS_KEY: $(SecretKey)
+      AWS_SESSION_TOKEN: $(SessionToken)
+      Function_Name_Output: $(Function_Name_Output)
+      Function_Name_Input: $(Function_Name_Input)
+      Gateway_ID: $(Gateway_ID)
+      ARN: $(Account_ARN)
+      Multi_ENV: $(Multi_ENV)

@@ -1,0 +1,435 @@
+name: ldi-hs-flattener-ca
+
+trigger: none
+pr: none
+
+stages:
+    - stage: Build
+      displayName: 'Stage -- Build'
+      jobs:
+        - job: Transform
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - task: AWSPowerShellModuleScript@1
+              inputs:
+                  regionName: 'us-east-1'
+                  filePath: './deployment/transform_config.ps1'
+                  awsCredentials: 'LDI CI/CD Role'
+              displayName: 'Variable Transformation'
+              name: transform
+
+            - task: PublishPipelineArtifact@1
+              inputs:
+                targetPath: '$(Build.SourcesDirectory)'
+                artifact: LDITransformArtifacts
+                parallel: true
+              displayName: 'LDI Transform Artifacts'
+
+        - job: build_app
+          dependsOn:
+            - transform
+          displayName: Build Deployment Package
+          pool:
+            vmImage: windows-latest
+          variables:
+            - name: TF_ORG
+              value: "$[dependencies.Transform.outputs['transform.TF_Org']]"
+            - name: TF_TEAM
+              value: "$[dependencies.Transform.outputs['transform.TF_Team']]"
+            - name: BUILD_ENV
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+          steps:
+          - download: current
+            artifact: LDITransformArtifacts
+
+          - script: dotnet build --configuration Release
+            displayName: 'dotnet build Release'  
+
+          # - task: DotNetCoreCLI@2
+          #   displayName: Run unit tests
+          #   inputs:
+          #     command: 'test'
+          #     projects: '**/*Tests*.csproj'
+          #     testRunTitle: 'Unit Tests'
+          # result of unit test: https://dev.azure.com/livingstonintl/Livingston%20Digital%20Innovation/_TestManagement/Runs?runId=26610&_a=resultQuery
+
+          - task: DotNetCoreCLI@2
+            displayName: Publish to $(Build.ArtifactStagingDirectory)
+            inputs:
+              command: 'publish'
+              publishWebProjects: false
+              projects: 'Lambda-CanadaFlattener/*.csproj'
+              arguments: '-c Release -o "$(Build.ArtifactStagingDirectory)"'
+
+          - task: PublishBuildArtifacts@1
+            displayName: Publish Artifacts
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'Lambda-CanadaFlattener'
+              parallel: true
+              # publishLocation: 'Container'
+
+          - script: |
+              echo "Moving transformed workspace_variables.txt"
+              move /Y  D:\a\1\LDITransformArtifacts\deployment\workspace_variables.txt .\deployment\workspace_variables.txt
+            displayName: 'Moving trasnformed variables'
+            workingDirectory: '$(Build.SourcesDirectory)'
+            # env:
+            #   PIPELINE_WORKSPACE: $(Pipeline.Workspace)
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: $(Build.SourcesDirectory)/deployment
+              includeRootFolder: false
+              archiveType: 'tar'
+              tarCompression: 'gz'
+              archiveFile: $(Build.SourcesDirectory)/deployment/Lambda-CanadaFlattener.tar.gz
+              verbose: True
+            displayName: 'Create Deploy Package'
+            name: archive
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.SourcesDirectory)/deployment/Lambda-CanadaFlattener.tar.gz'
+              artifact: Lambda-CanadaFlattener-tar
+              parallel: true
+            displayName: 'LDI HSFileFlattenerCA Artifacts TAR'
+
+
+    - stage: SetEnvStage
+      dependsOn:
+        - Build
+      displayName: 'Stage -- Set Environment'
+      jobs:
+        - job: SetEnvJob
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+    - stage: VerifyDevStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+      displayName: 'Stage -- Verify Dev'
+      jobs:
+        - job: VerifyDevStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'dev')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment Dev"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyDevStageJob
+          condition: eq(dependencies.VerifyDevStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_Dev_Stage
+      dependsOn:
+        - VerifyDevStage
+        - SetEnvStage
+        - Build
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.Build_Environment']]"
+      condition: in(dependencies.VerifyDevStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobDev
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'dev'), eq(stageDependencies.VerifyDevStage.VerifyDevStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_Dev
+          dependsOn: 
+            - SetEnvJobDev
+          displayName: Deploy -- Dev
+          variables:
+            - name: AccessKey
+              value: "$[dependencies.Transform.outputs['transform.AccessKey']]"
+            - name: SecretKey
+              value: "$[dependencies.Transform.outputs['transform.SecretKey']]"
+            - name: SessionToken
+              value: "$[dependencies.Transform.outputs['transform.SessionToken']]"
+            - name: Build_Environment
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+
+          pool:
+            vmImage: 'windows-latest'
+          environment: "ldi-aws-dev"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/file-flattener-ca-package-dev.yml
+
+    - stage: VerifyQAStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+      displayName: 'Stage -- Verify QA'
+      jobs:
+        - job: VerifyQAStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'qa')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment QA"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyQAStageJob
+          condition: eq(dependencies.VerifyQAStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_QA_Stage
+      dependsOn:
+        - VerifyQAStage
+        - SetEnvStage
+        - Build
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.Build_Environment']]"
+      condition: in(dependencies.VerifyQAStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobQA
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'qa'), eq(stageDependencies.VerifyQAStage.VerifyQAStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_QA
+          dependsOn: 
+            - SetEnvJobQA
+          displayName: Deploy -- QA
+          variables:
+            - name: AccessKey
+              value: "$[dependencies.Transform.outputs['transform.AccessKey']]"
+            - name: SecretKey
+              value: "$[dependencies.Transform.outputs['transform.SecretKey']]"
+            - name: SessionToken
+              value: "$[dependencies.Transform.outputs['transform.SessionToken']]"
+            - name: Build_Environment
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+
+          pool:
+            vmImage: 'windows-latest'
+          environment: "ldi-aws-qa"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/file-flattener-ca-package-qa.yml
+
+    - stage: VerifyUATStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+      displayName: 'Stage -- Verify UAT'
+      jobs:
+        - job: VerifyUATStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'uat')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment UAT"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyUATStageJob
+          condition: eq(dependencies.VerifyUATStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_UAT_Stage
+      dependsOn:
+        - VerifyUATStage
+        - SetEnvStage
+        - Build
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.Build_Environment']]"
+      condition: in(dependencies.VerifyUATStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobUAT
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'uat'), eq(stageDependencies.VerifyUATStage.VerifyUATStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_UAT
+          dependsOn: 
+            - SetEnvJobUAT
+          displayName: Deploy -- UAT
+          variables:
+            - name: AccessKey
+              value: "$[dependencies.Transform.outputs['transform.AccessKey']]"
+            - name: SecretKey
+              value: "$[dependencies.Transform.outputs['transform.SecretKey']]"
+            - name: SessionToken
+              value: "$[dependencies.Transform.outputs['transform.SessionToken']]"
+            - name: Build_Environment
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+
+          pool:
+            vmImage: 'windows-latest'
+          environment: "ldi-aws-uat"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/file-flattener-ca-package-uat.yml
+
+    - stage: VerifyProdStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+      displayName: 'Stage -- Verify Prod'
+      jobs:
+        - job: VerifyProdStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'prod')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment Prod"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyProdStageJob
+          condition: eq(dependencies.VerifyProdStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_Prod_Stage
+      dependsOn:
+        - VerifyProdStage
+        - SetEnvStage
+        - Build
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.Build_Environment']]"
+      condition: in(dependencies.VerifyProdStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobProd
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.Build_Environment'], 'prod'), eq(stageDependencies.VerifyProdStage.VerifyProdStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-latest'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_Prod
+          dependsOn: 
+            - SetEnvJobProd
+          displayName: Deploy -- Prod
+          variables:
+            - name: AccessKey
+              value: "$[dependencies.Transform.outputs['transform.AccessKey']]"
+            - name: SecretKey
+              value: "$[dependencies.Transform.outputs['transform.SecretKey']]"
+            - name: SessionToken
+              value: "$[dependencies.Transform.outputs['transform.SessionToken']]"
+            - name: Build_Environment
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+
+          pool:
+            vmImage: 'windows-latest'
+          environment: "ldi-aws-prod"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/file-flattener-ca-package-prod.yml
