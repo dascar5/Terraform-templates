@@ -66,19 +66,11 @@ resource "aws_security_group" "container" {
   ]
 
   ingress {
-    from_port = 443
-    to_port = 443
-    protocol = "tcp"
-    description = ""
-    security_groups = ["${aws_security_group.alb.id}","${data.aws_ssm_parameter.ui_sg_alb_id.value}","${data.aws_ssm_parameter.ui_sg_container_id.value}","${data.aws_ssm_parameter.searchwatch_sg.value}"]
-  }
-
-  ingress {
     from_port = 5001
     to_port = 5001
     protocol = "tcp"
     description = ""
-    security_groups = ["${aws_security_group.alb.id}","${data.aws_ssm_parameter.ui_sg_alb_id.value}","${data.aws_ssm_parameter.ui_sg_container_id.value}","${data.aws_ssm_parameter.searchwatch_sg.value}"]
+    security_groups = ["${aws_security_group.alb.id}"]
   }
 }
 
