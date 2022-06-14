@@ -1,0 +1,18 @@
+# add to security group name so it doesn't have to be destroyed manually
+-${substr(uuid(), 0, 3)}
+
+lifecycle {
+      create_before_destroy = true
+      ignore_changes        = [name]
+  }
+-------------------------------------------------------------------------------------
+# add to main.tf so you can run plans locally, don't forget to do terraform init first
+backend "remote" {
+    hostname = "app.terraform.io"
+    organization = "livingston-internation"
+
+    workspaces {
+      name = "ldi-app-dev"
+    }
+  }
+-------------------------------------------------------------------------------------
