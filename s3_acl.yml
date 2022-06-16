@@ -1,0 +1,41 @@
+- task: AWSPowerShellModuleScript@1
+    inputs:
+      scriptType: 'inline'
+      regionName: 'us-east-1'
+      awsCredentials: 'LDI CI/CD Role'
+      inlineScript: |
+            $Account_ARN = "200243427284"
+            $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+            $Build_Env = 'dev'
+
+            $AccessKeyExport = $STS_CREDS.AccessKeyId
+            $SecretAccessKeyExport = $STS_CREDS.SecretAccessKey
+            $SessionTokenExport = $STS_CREDS.SessionToken
+
+            Write-Host ("##vso[task.setvariable variable=AccessKey;issecret=true]$AccessKeyExport")
+            Write-Host ("##vso[task.setvariable variable=SecretKey;issecret=true]$SecretAccessKeyExport")
+            Write-Host ("##vso[task.setvariable variable=SessionToken;issecret=true]$SessionTokenExport")
+            
+            $Grants = @();
+            
+            $Shared_Dev = New-Object -TypeName Amazon.S3.Model.S3Grantee
+            $Shared_Dev.emailAddress    = "lii-shared-dev@livingstonintl.com"
+
+
+            $To_Grant_Dev = New-Object -TypeName Amazon.S3.Model.S3Grant
+            $To_Grant_Dev.Grantee = $Shared_Dev
+            $To_Grant_Dev.Permission = [Amazon.S3.S3Permission]::FULL_CONTROL
+            $Grants += $To_Grant_Dev
+
+
+            $Shared_Repo = New-Object -TypeName Amazon.S3.Model.S3Grantee
+            $Shared_Repo.emailAddress     = "lii-shared-repo@livingstonintl.com"
+
+            $To_Grant_Repo = New-Object -TypeName Amazon.S3.Model.S3Grant
+            $To_Grant_Repo.Grantee = $Shared_Repo
+            $To_Grant_Repo.Permission = [Amazon.S3.S3Permission]::FULL_CONTROL
+            $Grants += $To_Grant_Repo
+
+            Set-S3ACL -BucketName "lii-ldi-codeartifacts" -Key "azure/dev/Lambda-CanadaFlattener.zip" -AccessControlList_Grant $Grants -Owner_Id '9d354a6233823799ac07744d6d99d0cba80f46c37f7cfa8ba905e7f8350cb580' -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}
+    displayName: 'Set S3 ACL'
+    name: set_ACL
