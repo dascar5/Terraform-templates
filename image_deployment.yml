@@ -1,0 +1,523 @@
+name: ldi-process
+
+trigger: none
+pr: none
+
+stages:
+    - stage: Deploy_INF
+      displayName: 'Deploy ECR'
+      jobs:
+        - job: Deploy
+          pool: 
+            vmImage: 'windows-2022'
+          steps:
+          - checkout: git://Livingston Digital Innovation/lii-ldi-shared-ecr@$(System.PullRequest.TargetBranch)
+          - checkout: self
+          - task: AWSPowerShellModuleScript@1
+            inputs:
+                regionName: 'us-east-1'
+                filePath: '$(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/transform_config.ps1'
+                awsCredentials: 'LDI CI/CD Role'
+                arguments: "-Is_Remote_Repo 'True'"
+            displayName: 'Variable Transformation'
+            name: transform_ecr
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: $(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/
+              includeRootFolder: false
+              archiveType: 'tar'
+              tarCompression: 'gz'
+              archiveFile: $(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/deployment_package.tar.gz
+              verbose: True
+            displayName: 'Create Deploy Package'
+            name: archive
+
+          - task: AWSPowerShellModuleScript@1
+            inputs:
+              scriptType: 'inline'
+              regionName: 'us-east-1'
+              awsCredentials: 'LDI CI/CD Role'
+              inlineScript: |
+                    $Build_Environment = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1]
+                    If ($Build_Environment -ieq "main")
+                    {
+                      $Build_Environment = "prod"
+                    }
+                    Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true,isSecret=true]$Build_Environment")
+
+                    $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS).SecretString | ConvertFrom-Json
+                    $TF_Team = (Get-SECSecretValue -SecretID "/shared/tf_team/api" -Credential $STS_CREDS).SecretString | ConvertFrom-Json
+
+                    $TF_Org_Key = $TF_Org.key
+                    $TF_Team_Key = $TF_Team.key
+
+                    $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/deployment_package.tar.gz" -Encoding byte))
+                    $Payload ="{ ""workspace"": ""lii-ldi-shared-ecr-$Build_Environment"", ""deploy_package"": ""$Encoded_Archive"", ""tf_org"": ""$TF_Org_Key"", ""tf_team"": ""$TF_Team_Key"" }"
+                    
+                    $EncodedPayloadBytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
+                    $EncodedPayload = [System.Convert]::ToBase64String($EncodedPayloadBytes)
+                    Write-Host ("##vso[task.setvariable variable=Payload;isOutput=true,isSecret=true]$EncodedPayload")
+            displayName: 'Payload - Gather'
+            name: set_payload
+
+          - task: AWSShellScript@1
+            inputs:
+              regionName: 'us-east-1'
+              scriptType: 'inline'
+              inlineScript: "aws lambda invoke --function-name lii-tf-handler-main --invocation-type Event --payload $PAYLOAD response.json"
+              awsCredentials: 'LDI CI/CD Role'
+            displayName: 'Invoke'
+            env:
+              PAYLOAD: $(Payload)
+              BUILD_ENVIRONMENT: $(Build_Environment)
+
+          - task: AWSPowerShellModuleScript@1
+            inputs:
+              scriptType: 'inline'
+              regionName: 'us-east-1'
+              awsCredentials: 'LDI CI/CD Role'
+              inlineScript: |
+                    $Headers = @{
+                        Authorization="Bearer $env:TF_TEAM"
+                        ContentType="application/vnd.api+json"
+                    }
+
+                    $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/livingston-international/workspaces/lii-ldi-shared-ecr-$env:BUILD_ENVIRONMENT" -Headers $Headers
+
+                    If ($Response -ine $null)
+                    {
+                        $WS_ID = $Response.data.id
+                    }
+                    Else
+                    {
+                        Exit 1
+                    }
+
+                    If ($WS_ID -ine $null)
+                    {
+                        $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/workspaces/$WS_ID/runs" -Headers $Headers
+                        $Run_ID = $Response.data.id[0]
+                    }
+
+                    Do{
+                        $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/runs/$Run_ID" -Headers $Headers
+                        $Run_Status = $Response.data.attributes.status
+                        Start-Sleep -Seconds 15
+                    } Until (($Run_Status -ieq "applied") -or ($Run_Status -ieq "errored") -or ($Run_Status -ieq "planned_and_finished"))
+
+                    If ($Run_Status -ieq "errored")
+                    {
+                        Write-Host "TF Stage Failed - Retrieve Logs From Teams or Cloudwatch"
+                        Exit 1
+                    }
+                    Else
+                    {
+                        Write-Host "TF Apply Succeeded - Moving Forward"
+                        Exit 0
+                    }
+            displayName: 'Await Status'
+            name: await_status
+            env:
+              TF_TEAM: $(transform_ecr.TF_Team)
+              BUILD_ENVIRONMENT: $(transform_ecr.Build_Environment)
+              
+              
+
+    - stage: Build
+      dependsOn:
+        - Deploy_INF
+      displayName: 'Stage -- Build'
+      jobs:
+        - job: Transform
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: self
+            - task: AWSPowerShellModuleScript@1
+              inputs:
+                  regionName: 'us-east-1'
+                  filePath: './deployment/transform_config.ps1'
+                  awsCredentials: 'LDI CI/CD Role'
+              displayName: 'Variable Transformation'
+              name: transform
+
+            - task: PublishPipelineArtifact@1
+              inputs:
+                targetPath: '$(Build.SourcesDirectory)'
+                artifact: LDITransformArtifacts
+                parallel: true
+              displayName: 'LDI Transform Artifacts'
+
+        - job: Publish_Artifact
+          pool:
+            vmImage: 'ubuntu-latest'
+          dependsOn:
+            - Transform
+          variables:
+            - name: AccessKey
+              value: "$[dependencies.Transform.outputs['transform.AccessKey']]"
+            - name: SecretKey
+              value: "$[dependencies.Transform.outputs['transform.SecretKey']]"
+            - name: SessionToken
+              value: "$[dependencies.Transform.outputs['transform.SessionToken']]"
+            - name: ECR_Endpoint
+              value: "$[dependencies.Transform.outputs['transform.ECR_Endpoint']]"
+            - name: Build_Environment
+              value: "$[dependencies.Transform.outputs['transform.Build_Environment']]"
+            - name: Target_Repository
+              value: "$[dependencies.Transform.outputs['transform.Target_Repository']]"
+            - name: TF_Team
+              value: "$[dependencies.Transform.outputs['transform.TF_Team']]"
+
+          steps:
+            - checkout: none
+
+            - download: current
+              artifact: LDITransformArtifacts
+              name: download_transform
+
+            - task: AWSShellScript@1
+              inputs:
+                regionName: 'us-east-1'
+                scriptType: 'inline'
+                inlineScript: 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin https://$ECR_ENDPOINT/'
+              displayName: 'Aquire Docker Credentials'
+              env:
+                AWS_ACCESS_KEY_ID: $(AccessKey)
+                AWS_SECRET_ACCESS_KEY: $(SecretKey)
+                AWS_SESSION_TOKEN: $(SessionToken)
+                ECR_ENDPOINT: $(ECR_Endpoint)
+
+            - task: Docker@2
+              displayName: 'Build Image - Push to Repo'
+              inputs:
+                repository: $(ECR_Endpoint)/$(Target_Repository)
+                command: buildAndPush
+                buildContext: "$(Pipeline.Workspace)/LDITransformArtifacts/"
+                Dockerfile: '$(Pipeline.Workspace)/LDITransformArtifacts/Dockerfile'
+                addPipelineData: true
+                tags: |
+                  lii-ldi-process--$(Build_Environment)-$(Build.BuildId)
+
+    - stage: SetEnvStage
+      dependsOn:
+        - Build
+        - Deploy_INF
+      displayName: 'Stage -- Set Environment'
+      jobs:
+        - job: SetEnvJob
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=BuildEnvironment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+    - stage: VerifyDevStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      displayName: 'Stage -- Verify Dev'
+      jobs:
+        - job: VerifyDevStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'dev')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment Dev"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyDevStageJob
+          condition: eq(dependencies.VerifyDevStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_Dev_Stage
+      dependsOn:
+        - VerifyDevStage
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.BuildEnvironment']]"
+      condition: in(dependencies.VerifyDevStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobDev
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'dev'), eq(stageDependencies.VerifyDevStage.VerifyDevStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=BuildEnvironment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_Dev
+          dependsOn: SetEnvJobDev
+          displayName: Package -- Dev
+          variables:
+            - name: BuildEnvironment
+              value: "$[stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment']]"
+            - name: BuildEnvironmentDev
+              value: "$[dependencies.SetEnvJobMain.outputs['setenv.BuildEnvironment']]"
+          pool:
+            vmImage: 'windows-2022'
+          environment: "ldi-aws-dev"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/mult-desc-srch-process-dev.yml
+
+    - stage: VerifyQAStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      displayName: 'Stage -- Verify QA'
+      jobs:
+        - job: VerifyQAStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'qa')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment QA"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyQAStageJob
+          condition: eq(dependencies.VerifyQAStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_QA_Stage
+      dependsOn:
+        - VerifyQAStage
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.BuildEnvironment']]"
+      condition: in(dependencies.VerifyQAStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobQA
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'qa'), eq(stageDependencies.VerifyQAStage.VerifyQAStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=BuildEnvironment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_QA
+          dependsOn: SetEnvJobQA
+          displayName: Package -- QA
+          variables:
+            - name: BuildEnvironment
+              value: "$[stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment']]"
+            - name: BuildEnvironmentQA
+              value: "$[dependencies.SetEnvJobMain.outputs['setenv.BuildEnvironment']]"
+          pool:
+            vmImage: 'windows-2022'
+          environment: "ldi-aws-qa"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/mult-desc-srch-process-qa.yml
+
+    - stage: VerifyUATStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      displayName: 'Stage -- Verify UAT'
+      jobs:
+        - job: VerifyUATStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'uat')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment UAT"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyUATStageJob
+          condition: eq(dependencies.VerifyUATStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_UAT_Stage
+      dependsOn:
+        - VerifyUATStage
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.BuildEnvironment']]"
+      condition: in(dependencies.VerifyUATStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobUAT
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'uat'), eq(stageDependencies.VerifyUATStage.VerifyUATStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=BuildEnvironment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_UAT
+          dependsOn: SetEnvJobUAT
+          displayName: Package -- UAT
+          variables:
+            - name: BuildEnvironment
+              value: "$[stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment']]"
+            - name: BuildEnvironmentUAT
+              value: "$[dependencies.SetEnvJobMain.outputs['setenv.BuildEnvironment']]"
+          pool:
+            vmImage: 'windows-2022'
+          environment: "ldi-aws-uat"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/mult-desc-srch-process-uat.yml
+
+    - stage: VerifyPRODStage
+      dependsOn:
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      displayName: 'Stage -- Verify PROD'
+      jobs:
+        - job: VerifyPRODStageJob
+          condition: eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'main')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "Detected Target Environment PROD"'
+              displayName: 'Verify Target Environment'
+              name: verifyenv
+
+        - job: FailState
+          dependsOn: VerifyPRODStageJob
+          condition: eq(dependencies.VerifyPRODStageJob.result, 'Skipped')
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2          
+              inputs:
+                targetType: 'inline'
+                script: 'Write-Host "##vso[task.complete result=SucceededWithIssues;]"'
+
+    - stage: Package_PROD_Stage
+      dependsOn:
+        - VerifyPRODStage
+        - SetEnvStage
+        - Build
+        - Deploy_INF
+      variables:
+        - name: TF_Team
+          value: "$[stageDependencies.Build.Transform.outputs['transform.TF_Team']]"
+        - name: Build_Environment
+          value: "$[stageDependencies.Build.Transform.outputs['transform.BuildEnvironment']]"
+      condition: in(dependencies.VerifyPRODStage.result, 'Succeeded')
+      displayName: 'Stage -- Package & Push'
+      jobs:
+        - job: SetEnvJobPROD
+          condition: and(eq(stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment'], 'main'), eq(stageDependencies.VerifyPRODStage.VerifyPRODStageJob.result, 'Succeeded'))
+          pool:
+            vmImage: 'windows-2022'
+          steps:
+            - checkout: none
+            - task: PowerShell@2
+              inputs:
+                targetType: 'inline'
+                script: '$BuildEnv = (${env:System_PullRequest_TargetBranch}.Split("/"))[-1] ; Write-Host ("##vso[task.setvariable variable=BuildEnvironment;isOutput=true]$BuildEnv")'
+              displayName: 'Set Build Environment'
+              name: setenv
+
+        - deployment: Package_PROD
+          dependsOn: SetEnvJobPROD
+          displayName: Package -- PROD
+          variables:
+            - name: BuildEnvironment
+              value: "$[stageDependencies.SetEnvStage.SetEnvJob.outputs['setenv.BuildEnvironment']]"
+            - name: BuildEnvironmentPROD
+              value: "$[dependencies.SetEnvJobMain.outputs['setenv.BuildEnvironment']]"
+          pool:
+            vmImage: 'windows-2022'
+          environment: "ldi-aws-prod"
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - template: templates/mult-desc-srch-process-prod.yml
