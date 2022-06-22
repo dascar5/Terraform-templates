@@ -7,12 +7,32 @@ locals{
 }
 
 locals{
-  aws_env = length(regexall("dev|qa", var.env)) > 0 ? "mlnonprod" : "mlprod"
+  dev1 = "${var.env == "dev" ? "Z03602322VWTWFYJDB6N0" : ""}"
+  qa1 = "${var.env == "qa" ? "Z03697553GJ5S7LZTYWKR" : ""}"
+  uat1 = "${var.env == "uat" ? "" : ""}"
+  prod1 = "${var.env == "prod" ? "" : ""}"
+  zone = "${coalesce(local.dev1, local.qa1, local.uat1, local.prod1)}"
 }
 
+locals{
+  aws_env = length(regexall("dev|qa", var.env)) > 0 ? "mlnonprod" : "mlprod"
+}
+#Error creating API Gateway Domain Name: BadRequestException: The domain name you provided already exists.
 resource "aws_api_gateway_domain_name" "domain" {
-  domain_name = "${var.env}.${local.aws_env}.liiaws.net"
+  domain_name = "ldi-apig.${var.env}.${local.aws_env}.liiaws.net"
   certificate_arn = local.acm
+}
+
+resource "aws_route53_record" "example" {
+  name    = aws_api_gateway_domain_name.domain.domain_name
+  type    = "A"
+  zone_id = local.zone
+
+  alias {
+    evaluate_target_health = true
+    name                   = aws_api_gateway_domain_name.domain.cloudfront_domain_name
+    zone_id                = aws_api_gateway_domain_name.domain.cloudfront_zone_id
+  }
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_downloader" {
