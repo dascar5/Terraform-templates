@@ -1,4 +1,12 @@
 locals{
+  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b" : ""}"
+  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9" : ""}"
+  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91" : ""}"
+  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:711237182968:certificate/6b2a5e83-f9ee-4e4e-9767-2bbdc9d16324" : ""}"
+  acm = "${coalesce(local.dev, local.qa, local.uat, local.prod)}"
+}
+
+locals{
   aws_env = length(regexall("dev|qa", var.env)) > 0 ? "mlnonprod" : "mlprod"
 }
 
@@ -18,6 +26,7 @@ resource "aws_api_gateway_rest_api" "apig_downloader" {
 resource "aws_api_gateway_base_path_mapping" "apig_downloader" {
   api_id      = aws_api_gateway_rest_api.apig_downloader.id
   base_path = "hs"
+  certificate_arn = local.acm
   domain_name = aws_api_gateway_domain_name.domain.domain_name
 }
 
@@ -39,6 +48,7 @@ resource "aws_api_gateway_rest_api" "apig_searchterm" {
 resource "aws_api_gateway_base_path_mapping" "apig_searchterm" {
   api_id      = aws_api_gateway_rest_api.apig_searchterm.id
   base_path = "st"
+  certificate_arn = local.acm
   domain_name = aws_api_gateway_domain_name.domain.domain_name
 }
 
@@ -60,6 +70,7 @@ resource "aws_api_gateway_rest_api" "apig_process" {
 resource "aws_api_gateway_base_path_mapping" "apig_process" {
   api_id      = aws_api_gateway_rest_api.apig_process.id
   base_path = "mds"
+  certificate_arn = local.acm
   domain_name = aws_api_gateway_domain_name.domain.domain_name
 }
 
@@ -81,6 +92,7 @@ resource "aws_api_gateway_rest_api" "apig_searchwatch" {
 resource "aws_api_gateway_base_path_mapping" "apig_searchwatch" {
   api_id      = aws_api_gateway_rest_api.apig_searchwatch.id
   base_path = "sw"
+  certificate_arn = local.acm
   domain_name = aws_api_gateway_domain_name.domain.domain_name
 }
 
@@ -102,6 +114,7 @@ resource "aws_api_gateway_rest_api" "apig_upc" {
 resource "aws_api_gateway_base_path_mapping" "apig_upc" {
   api_id      = aws_api_gateway_rest_api.apig_upc.id
   base_path = "upc"
+  certificate_arn = local.acm
   domain_name = aws_api_gateway_domain_name.domain.domain_name
 }
 
