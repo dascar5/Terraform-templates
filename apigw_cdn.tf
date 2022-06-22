@@ -1,39 +1,82 @@
-locals{
-  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b" : ""}"
-  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9" : ""}"
-  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91" : ""}"
-  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:711237182968:certificate/6b2a5e83-f9ee-4e4e-9767-2bbdc9d16324" : ""}"
-  acm = "${coalesce(local.dev, local.qa, local.uat, local.prod)}"
+#dev domain
+resource "aws_api_gateway_domain_name" "dev-domain" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  domain_name = "ldi-apig.dev.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b"
 }
 
-locals{
-  dev1 = "${var.env == "dev" ? "Z03602322VWTWFYJDB6N0" : ""}"
-  qa1 = "${var.env == "qa" ? "Z03697553GJ5S7LZTYWKR" : ""}"
-  uat1 = "${var.env == "uat" ? "" : ""}"
-  prod1 = "${var.env == "prod" ? "" : ""}"
-  zone = "${coalesce(local.dev1, local.qa1, local.uat1, local.prod1)}"
+#qa domain
+resource "aws_api_gateway_domain_name" "qa-domain" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  domain_name = "ldi-apig.qa.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9"
 }
 
-locals{
-  aws_env = length(regexall("dev|qa", var.env)) > 0 ? "mlnonprod" : "mlprod"
-}
-#Error creating API Gateway Domain Name: BadRequestException: The domain name you provided already exists.
-resource "aws_api_gateway_domain_name" "domain" {
-  domain_name = "ldi-apig.${var.env}.${local.aws_env}.liiaws.net"
-  certificate_arn = local.acm
-}
+# resource "aws_api_gateway_domain_name" "uat-domain" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   domain_name = "ldi-apig.uat.mlnonprod.liiaws.net"
+#   certificate_arn = "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91"
+# }
 
-resource "aws_route53_record" "example" {
-  name    = aws_api_gateway_domain_name.domain.domain_name
+# resource "aws_api_gateway_domain_name" "uat-domain" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   domain_name = "ldi-apig.uat.mlnonprod.liiaws.net"
+#   certificate_arn = "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91"
+# }
+
+
+#---------------------------------------------------------------------------------------
+resource "aws_route53_record" "dev-record" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  name    = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
   type    = "A"
-  zone_id = local.zone
+  zone_id = "Z03602322VWTWFYJDB6N0"
 
   alias {
     evaluate_target_health = true
-    name                   = aws_api_gateway_domain_name.domain.cloudfront_domain_name
-    zone_id                = aws_api_gateway_domain_name.domain.cloudfront_zone_id
+    name                   = aws_api_gateway_domain_name.dev-domain[count.index].cloudfront_domain_name
+    zone_id                = aws_api_gateway_domain_name.dev-domain[count.index].cloudfront_zone_id
   }
 }
+
+resource "aws_route53_record" "qa-record" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  name    = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+  type    = "A"
+  zone_id = "Z03697553GJ5S7LZTYWKR"
+
+  alias {
+    evaluate_target_health = true
+    name                   = aws_api_gateway_domain_name.qa-domain[count.index].cloudfront_domain_name
+    zone_id                = aws_api_gateway_domain_name.qa-domain[count.index].cloudfront_zone_id
+  }
+}
+
+# resource "aws_route53_record" "uat-record" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   name    = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+#   type    = "A"
+#   zone_id = "?"
+
+#   alias {
+#     evaluate_target_health = true
+#     name                   = aws_api_gateway_domain_name.uat-domain[count.index].cloudfront_domain_name
+#     zone_id                = aws_api_gateway_domain_name.uat-domain[count.index].cloudfront_zone_id
+#   }
+# }
+
+# resource "aws_route53_record" "prod-record" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   name    = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+#   type    = "A"
+#   zone_id = "?"
+
+#   alias {
+#     evaluate_target_health = true
+#     name                   = aws_api_gateway_domain_name.prod-domain[count.index].cloudfront_domain_name
+#     zone_id                = aws_api_gateway_domain_name.prod-domain[count.index].cloudfront_zone_id
+#   }
+# }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_downloader" {
   name = "ldi-hs-file-downloader-ca-apig"
@@ -44,11 +87,37 @@ resource "aws_api_gateway_rest_api" "apig_downloader" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "apig_downloader" {
+resource "aws_api_gateway_base_path_mapping" "apig_downloader-dev" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "dev"
   api_id      = aws_api_gateway_rest_api.apig_downloader.id
-  base_path = "hs"
-  domain_name = aws_api_gateway_domain_name.domain.domain_name
+  base_path = "hs-dev"
+  domain_name = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
 }
+
+resource "aws_api_gateway_base_path_mapping" "apig_downloader-qa" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "qa"
+  api_id      = aws_api_gateway_rest_api.apig_downloader.id
+  base_path = "hs-qa"
+  domain_name = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+}
+
+# resource "aws_api_gateway_base_path_mapping" "apig_downloader-uat" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "uat"
+#   api_id      = aws_api_gateway_rest_api.apig_downloader.id
+#   base_path = "hs-uat"
+#   domain_name = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+# }
+
+# resource "aws_api_gateway_base_path_mapping" "apig_downloader-prod" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "prod"
+#   api_id      = aws_api_gateway_rest_api.apig_downloader.id
+#   base_path = "hs-prod"
+#   domain_name = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+# }
 
 resource "aws_ssm_parameter" "apig_downloader" {
   name  = "/lii-ldi/${var.env}/api/hs-file-downloader-ca/APIId"
@@ -65,11 +134,37 @@ resource "aws_api_gateway_rest_api" "apig_searchterm" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "apig_searchterm" {
+resource "aws_api_gateway_base_path_mapping" "apig_searchterm-dev" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "dev"
   api_id      = aws_api_gateway_rest_api.apig_searchterm.id
-  base_path = "st"
-  domain_name = aws_api_gateway_domain_name.domain.domain_name
+  base_path = "st-dev"
+  domain_name = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
 }
+
+resource "aws_api_gateway_base_path_mapping" "apig_searchterm-qa" { 
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "qa"
+  api_id      = aws_api_gateway_rest_api.apig_searchterm.id
+  base_path = "st-qa"
+  domain_name = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+}
+
+# resource "aws_api_gateway_base_path_mapping" "apig_searchterm-uat" { 
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "uat"
+#   api_id      = aws_api_gateway_rest_api.apig_searchterm.id
+#   base_path = "st-uat"
+#   domain_name = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+# }
+
+# resource "aws_api_gateway_base_path_mapping" "apig_searchterm-prod" { 
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "prod"
+#   api_id      = aws_api_gateway_rest_api.apig_searchterm.id
+#   base_path = "st-prod"
+#   domain_name = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+# }
 
 resource "aws_ssm_parameter" "apig_searchterm" {
   name  = "/lii-ldi/${var.env}/api/search-term/APIId"
@@ -86,11 +181,37 @@ resource "aws_api_gateway_rest_api" "apig_process" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "apig_process" {
+resource "aws_api_gateway_base_path_mapping" "apig_process-dev" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "dev"
   api_id      = aws_api_gateway_rest_api.apig_process.id
-  base_path = "mds"
-  domain_name = aws_api_gateway_domain_name.domain.domain_name
+  base_path = "mds-dev"
+  domain_name = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
 }
+
+resource "aws_api_gateway_base_path_mapping" "apig_process-qa" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "qa"
+  api_id      = aws_api_gateway_rest_api.apig_process.id
+  base_path = "mds-qa"
+  domain_name = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+}
+
+# resource "aws_api_gateway_base_path_mapping" "apig_process-uat" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "uat"
+#   api_id      = aws_api_gateway_rest_api.apig_process.id
+#   base_path = "mds-uat"
+#   domain_name = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+# }
+
+# resource "aws_api_gateway_base_path_mapping" "apig_process-prod" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "prod"
+#   api_id      = aws_api_gateway_rest_api.apig_process.id
+#   base_path = "mds-prod"
+#   domain_name = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+# }
 
 resource "aws_ssm_parameter" "apig_process" {
   name  = "/lii-ldi/${var.env}/api/mult-desc-srch-process/APIId"
@@ -107,11 +228,37 @@ resource "aws_api_gateway_rest_api" "apig_searchwatch" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "apig_searchwatch" {
+resource "aws_api_gateway_base_path_mapping" "apig_searchwatch-dev" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "dev"
   api_id      = aws_api_gateway_rest_api.apig_searchwatch.id
-  base_path = "sw"
-  domain_name = aws_api_gateway_domain_name.domain.domain_name
+  base_path = "sw-dev"
+  domain_name = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
 }
+
+resource "aws_api_gateway_base_path_mapping" "apig_searchwatch-qa" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "qa"
+  api_id      = aws_api_gateway_rest_api.apig_searchwatch.id
+  base_path = "sw-qa"
+  domain_name = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+}
+
+# resource "aws_api_gateway_base_path_mapping" "apig_searchwatch-uat" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "uat"
+#   api_id      = aws_api_gateway_rest_api.apig_searchwatch.id
+#   base_path = "sw-uat"
+#   domain_name = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+# }
+
+# resource "aws_api_gateway_base_path_mapping" "apig_searchwatch-prod" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "prod"
+#   api_id      = aws_api_gateway_rest_api.apig_searchwatch.id
+#   base_path = "sw-prod"
+#   domain_name = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+# }
 
 resource "aws_ssm_parameter" "apig_searchwatch" {
   name  = "/lii-ldi/${var.env}/api/searchwatch/APIId"
@@ -128,11 +275,37 @@ resource "aws_api_gateway_rest_api" "apig_upc" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "apig_upc" {
+resource "aws_api_gateway_base_path_mapping" "apig_upc-dev" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "dev"
   api_id      = aws_api_gateway_rest_api.apig_upc.id
-  base_path = "upc"
-  domain_name = aws_api_gateway_domain_name.domain.domain_name
+  base_path = "upc-dev"
+  domain_name = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
 }
+
+resource "aws_api_gateway_base_path_mapping" "apig_upc-qa" {
+  count = length(regexall("dev", var.env)) > 0 ? 1 : 0
+  stage_name = "qa"
+  api_id      = aws_api_gateway_rest_api.apig_upc.id
+  base_path = "upc-qa"
+  domain_name = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
+}
+
+# resource "aws_api_gateway_base_path_mapping" "apig_upc-uat" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "uat"
+#   api_id      = aws_api_gateway_rest_api.apig_upc.id
+#   base_path = "upc-uat"
+#   domain_name = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
+# }
+
+# resource "aws_api_gateway_base_path_mapping" "apig_upc-prod" {
+#   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
+#   stage_name = "prod"
+#   api_id      = aws_api_gateway_rest_api.apig_upc.id
+#   base_path = "upc-prod"
+#   domain_name = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
+# }
 
 resource "aws_ssm_parameter" "apig_upc" {
   name  = "/lii-ldi/${var.env}/api/upcservice/APIId"
