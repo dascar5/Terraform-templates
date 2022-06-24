@@ -6,6 +6,30 @@ locals{
   acm = "${coalesce(local.dev, local.qa, local.uat, local.prod)}"
 }
 
+locals{
+  dev1 = "${var.env == "dev" ? "Z03602322VWTWFYJDB6N0" : ""}"
+  qa1 = "${var.env == "qa" ? "Z03697553GJ5S7LZTYWKR" : ""}"
+  uat1 = "${var.env == "uat" ? "Z1011821EEMMUTMM2C02" : ""}"
+  prod1 = "${var.env == "prod" ? "Z10119602Q54AK8H00APS" : ""}"
+  zone = "${coalesce(local.dev1, local.qa1, local.uat1, local.prod1)}"
+}
+
+locals{
+  aws_env = length(regexall("dev|qa", var.env)) > 0 ? "mlnonprod" : "mlprod"
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = local.zone
+  name    = "cloudfront.${var.env}.${local.aws_env}.liiaws.net"
+  type    = "A"
+
+  # alias {
+  #   name                   = aws_lb.main.dns_name
+  #   zone_id                = aws_lb.main.zone_id
+  #   evaluate_target_health = true
+  # }
+}
+
 data "aws_iam_policy_document" "assume-policy" {
   statement {
     sid    = ""
@@ -105,7 +129,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  aliases = ["cloudfront.${var.env}.mlnonprod.liiaws.net"]
+  aliases = ["${aws_route53_record.www.name}"]
 
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
