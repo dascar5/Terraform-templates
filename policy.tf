@@ -13,7 +13,7 @@ data "aws_iam_policy_document" "image-assume-policy" {
 }
 
 resource "aws_iam_role" "iam_for_image" {
-  name               = "ldi-${var.env}-app"
+  name               = "project-${var.env}-app"
   assume_role_policy = "${data.aws_iam_policy_document.image-assume-policy.json}"
 }
 
@@ -23,7 +23,7 @@ resource "aws_iam_role_policy_attachment" "vpc_policy_for_image" {
 }
 
 resource "aws_security_group" "allow_egress" {
-  name        = "allow_egress_ldi-${var.env}-app-${substr(uuid(), 0, 3)}"
+  name        = "allow_egress_project-${var.env}-app-${substr(uuid(), 0, 3)}"
   description = "Allows all Egress"
   vpc_id      = "${var.vpcid}"
 
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "ecr" {
 }
 
 resource "aws_iam_policy" "ecr" {
-  name   = "ecr_ldi-${var.env}-app"
+  name   = "ecr_project-${var.env}-app"
   policy = "${data.aws_iam_policy_document.ecr.json}"
 }
 
@@ -81,7 +81,7 @@ data "aws_iam_policy_document" "ecs" {
 }
 
 resource "aws_iam_policy" "ecs" {
-  name   = "ecs_ldi-${var.env}-app"
+  name   = "ecs_project-${var.env}-app"
   policy = "${data.aws_iam_policy_document.ecs.json}"
 }
 
@@ -102,7 +102,7 @@ data "aws_iam_policy_document" "s3-access" {
 }
 
 resource "aws_iam_policy" "s3-access" {
-    name = "s3-access_ldi-${var.env}-app"
+    name = "s3-access_project-${var.env}-app"
     path = "/"
     policy = data.aws_iam_policy_document.s3-access.json
 }

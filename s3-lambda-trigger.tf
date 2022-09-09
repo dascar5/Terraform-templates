@@ -1,5 +1,5 @@
 resource "aws_s3_bucket_notification" "aws-lambda-trigger" {
-  bucket = "ldi-${var.env}-multi-desc-search-batch"
+  bucket = "project-${var.env}-multi-desc-search-batch"
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambda.arn
     events              = ["s3:ObjectCreated:*"]
@@ -12,5 +12,5 @@ resource "aws_lambda_permission" "permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda.function_name
   principal     = "s3.amazonaws.com"
-  source_arn    = "arn:aws:s3:::ldi-${var.env}-multi-desc-search-batch"
+  source_arn    = "arn:aws:s3:::project-${var.env}-multi-desc-search-batch"
 }

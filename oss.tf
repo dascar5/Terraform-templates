@@ -1,5 +1,5 @@
 resource "aws_elasticsearch_domain" "es" {
-  domain_name           = "ldi-${var.env}-ess"
+  domain_name           = "project-${var.env}-ess"
   elasticsearch_version = "OpenSearch_1.1"
  
   cluster_config {
@@ -56,7 +56,7 @@ resource "aws_iam_service_linked_role" "es" {
 }
 
 resource "aws_iam_role" "iam_for_oss" {
-  name               = "ldi-${var.env}-oss-role"
+  name               = "project-${var.env}-oss-role"
   assume_role_policy = <<POLICY
 {
     "Version": "2012-10-17",
@@ -78,7 +78,7 @@ POLICY
 }
 
 resource "aws_iam_role_policy" "policy" {
-  name = "LDIOSSrolePolicy"
+  name = "projectOSSrolePolicy"
 
   policy = <<POLICY
 {
@@ -108,7 +108,7 @@ POLICY
 }
 
 resource "aws_ssm_parameter" "role_arn" {
-  name  = "/ldi/role/${var.env}/oss"
+  name  = "/project/role/${var.env}/oss"
   type  = "String"
   value = "${aws_iam_role.iam_for_oss.arn}"
 }

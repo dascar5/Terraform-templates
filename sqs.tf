@@ -1,5 +1,5 @@
 resource "aws_sqs_queue" "inbound-sqs-dlq" {
-  name                  = "lii-gdm-ms-${var.env}-inbound-sqs-dlq.fifo"
+  name                  = "project-${var.env}-inbound-sqs-dlq.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 30
   message_retention_seconds = 1209600
@@ -23,7 +23,7 @@ resource "aws_sqs_queue" "inbound-sqs-dlq" {
 }
 
 resource "aws_sqs_queue" "inbound-sqs-q1" {
-  name                  = "lii-gdm-ms-${var.env}-inbound-sqs-q1.fifo"
+  name                  = "project-${var.env}-inbound-sqs-q1.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 1200
   message_retention_seconds = 864000
@@ -40,7 +40,7 @@ resource "aws_sqs_queue" "inbound-sqs-q1" {
 }
 
 resource "aws_sqs_queue" "inbound-sqs-q2" {
-  name                  = "lii-gdm-ms-${var.env}-inbound-sqs-q2.fifo"
+  name                  = "project-${var.env}-inbound-sqs-q2.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 1200
   message_retention_seconds = 864000
@@ -59,7 +59,7 @@ resource "aws_sqs_queue" "inbound-sqs-q2" {
 #-----------------------------------------------------------------------------------------
 
 resource "aws_sqs_queue" "pa-sqs-dlq" {
-  name                  = "lii-gdm-ms-${var.env}-pa-sqs-dlq.fifo"
+  name                  = "project-${var.env}-pa-sqs-dlq.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 30
   message_retention_seconds = 1209600
@@ -73,7 +73,7 @@ resource "aws_sqs_queue" "pa-sqs-dlq" {
 }
 
 resource "aws_sqs_queue" "pa-sqs-q1" {
-  name                  = "lii-gdm-ms-${var.env}-pa-sqs-q1.fifo"
+  name                  = "project-${var.env}-pa-sqs-q1.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 2700
   message_retention_seconds = 864000
@@ -90,7 +90,7 @@ resource "aws_sqs_queue" "pa-sqs-q1" {
 }
 
 resource "aws_sqs_queue" "pa-sqs-q2" {
-  name                  = "lii-gdm-ms-${var.env}-pa-sqs-q2.fifo"
+  name                  = "project-${var.env}-pa-sqs-q2.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 2700
   message_retention_seconds = 864000
@@ -109,7 +109,7 @@ resource "aws_sqs_queue" "pa-sqs-q2" {
 #-----------------------------------------------------------------------------------------
 
 resource "aws_sqs_queue" "outbound-sqs-dlq" {
-  name                  = "lii-gdm-ms-${var.env}-outbound-sqs-dlq.fifo"
+  name                  = "project-${var.env}-outbound-sqs-dlq.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 30
   message_retention_seconds = 1209600
@@ -123,7 +123,7 @@ resource "aws_sqs_queue" "outbound-sqs-dlq" {
 }
 
 resource "aws_sqs_queue" "outbound-sqs-q1" {
-  name                  = "lii-gdm-ms-${var.env}-outbound-sqs-q1.fifo"
+  name                  = "project-${var.env}-outbound-sqs-q1.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 1800
   message_retention_seconds = 864000
@@ -140,7 +140,7 @@ resource "aws_sqs_queue" "outbound-sqs-q1" {
 }
 
 resource "aws_sqs_queue" "outbound-sqs-q2" {
-  name                  = "lii-gdm-ms-${var.env}-outbound-sqs-q2.fifo"
+  name                  = "project-${var.env}-outbound-sqs-q2.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 1800
   message_retention_seconds = 864000
@@ -159,7 +159,7 @@ resource "aws_sqs_queue" "outbound-sqs-q2" {
 #-----------------------------------------------------------------------------------------
 
 resource "aws_sqs_queue" "integration-sqs" {
-  name                  = "lii-gdm-ms-${var.env}-integration-sqs.fifo"
+  name                  = "project-${var.env}-integration-sqs.fifo"
   fifo_queue            = true
   visibility_timeout_seconds = 60
   message_retention_seconds = 1209600

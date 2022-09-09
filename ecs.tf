@@ -1,13 +1,13 @@
 locals{
-  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b" : ""}"
-  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9" : ""}"
-  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91" : ""}"
-  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:711237182968:certificate/6b2a5e83-f9ee-4e4e-9767-2bbdc9d16324" : ""}"
+  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:xxx" : ""}"
   acm = "${coalesce(local.dev, local.qa, local.uat, local.prod)}"
 }
 
 resource "aws_ecs_cluster" "cluster" {
-  name = "ldi-${var.env}-app-cluster"
+  name = "project-${var.env}-app-cluster"
 
   setting {
     name  = "containerInsights"
@@ -16,11 +16,11 @@ resource "aws_ecs_cluster" "cluster" {
 }
 
 resource "aws_cloudwatch_log_group" "logs" {
-  name = "ldi-${var.env}-app-task-log"
+  name = "project-${var.env}-app-task-log"
 }
 
 resource "aws_ecs_task_definition" "task" {
-  family = "ldi-${var.env}-app-task"
+  family = "project-${var.env}-app-task"
   requires_compatibilities = ["FARGATE","EC2"]
   network_mode = "awsvpc"
   cpu       = 1024
@@ -30,7 +30,7 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = <<DEFINITION
   [
     {
-      "name": "ldi-${var.env}-app-task",
+      "name": "project-${var.env}-app-task",
       "image": "${tostring(var.imageuri)}",
       "entryPoint": [],
       "environment": [],
@@ -55,7 +55,7 @@ resource "aws_ecs_task_definition" "task" {
 }
 
 resource "aws_lb" "main" {
-  name               = "ldi-${var.env}-app-alb"
+  name               = "project-${var.env}-app-alb"
   internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
@@ -65,7 +65,7 @@ resource "aws_lb" "main" {
 }
 
 resource "aws_lb_target_group" "main" {
-  name        = "ldi-${var.env}-tg-app-${substr(uuid(), 0, 3)}"
+  name        = "project-${var.env}-tg-app-${substr(uuid(), 0, 3)}"
   port        = 5001
   protocol    = "HTTP"
   target_type = "ip"
@@ -126,7 +126,7 @@ resource "aws_alb_listener" "https" {
 
 
 resource "aws_ecs_service" "service" {
-  name            = "ldi-${var.env}-app-service"
+  name            = "project-${var.env}-app-service"
   cluster         = aws_ecs_cluster.cluster.id
   task_definition = aws_ecs_task_definition.task.arn
   desired_count   = 1
@@ -144,7 +144,7 @@ resource "aws_ecs_service" "service" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "ldi-${var.env}-app-task"
+    container_name   = "project-${var.env}-app-task"
     container_port   = 5001
   }
 
@@ -154,7 +154,7 @@ resource "aws_ecs_service" "service" {
 }
 
 resource "aws_iam_role" "ecs_task_role" {
-  name = "ldi-${var.env}-app-task-role"
+  name = "project-${var.env}-app-task-role"
  
   assume_role_policy = <<EOF
 {
@@ -174,7 +174,7 @@ EOF
 }
 
 resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "ldi-${var.env}-app-task-role-ecsTaskExecutionRole"
+  name = "project-${var.env}-app-task-role-ecsTaskExecutionRole"
  
   assume_role_policy = <<EOF
 {
@@ -210,7 +210,7 @@ data "aws_iam_policy_document" "s3-access-1" {
 }
 
 resource "aws_iam_policy" "s3-access-1" {
-    name = "s3-access-1_ldi-${var.env}-app"
+    name = "s3-access-1_project-${var.env}-app"
     path = "/"
     policy = data.aws_iam_policy_document.s3-access-1.json
 }

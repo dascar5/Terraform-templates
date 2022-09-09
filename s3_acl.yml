@@ -19,7 +19,7 @@
             $Grants = @();
             
             $Shared_Dev = New-Object -TypeName Amazon.S3.Model.S3Grantee
-            $Shared_Dev.emailAddress    = "lii-shared-dev@livingstonintl.com"
+            $Shared_Dev.emailAddress    = "lii-shared-dev@xxxintl.com"
 
 
             $To_Grant_Dev = New-Object -TypeName Amazon.S3.Model.S3Grant
@@ -29,13 +29,13 @@
 
 
             $Shared_Repo = New-Object -TypeName Amazon.S3.Model.S3Grantee
-            $Shared_Repo.emailAddress     = "lii-shared-repo@livingstonintl.com"
+            $Shared_Repo.emailAddress     = "lii-shared-repo@xxxintl.com"
 
             $To_Grant_Repo = New-Object -TypeName Amazon.S3.Model.S3Grant
             $To_Grant_Repo.Grantee = $Shared_Repo
             $To_Grant_Repo.Permission = [Amazon.S3.S3Permission]::FULL_CONTROL
             $Grants += $To_Grant_Repo
 
-            Set-S3ACL -BucketName "lii-ldi-codeartifacts" -Key "azure/dev/Lambda-CanadaFlattener.zip" -AccessControlList_Grant $Grants -Owner_Id '9d354a6233823799ac07744d6d99d0cba80f46c37f7cfa8ba905e7f8350cb580' -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}
+            Set-S3ACL -BucketName "lii-ldi-codeartifacts" -Key "azure/dev/Lambda-CanadaFlattener.zip" -AccessControlList_Grant $Grants -Owner_Id 'xxx' -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}
     displayName: 'Set S3 ACL'
     name: set_ACL

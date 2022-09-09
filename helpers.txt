@@ -9,10 +9,10 @@ lifecycle {
 # add to main.tf so you can run plans locally, don't forget to do terraform init first
 backend "remote" {
     hostname = "app.terraform.io"
-    organization = "livingston-internation"
+    organization = "xxx-international"
 
     workspaces {
-      name = "ldi-app-dev"
+      name = "workspace-dev"
     }
   }
 -------------------------------------------------------------------------------------

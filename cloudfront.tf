@@ -1,16 +1,16 @@
 locals{
-  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b" : ""}"
-  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9" : ""}"
-  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91" : ""}"
-  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:711237182968:certificate/6b2a5e83-f9ee-4e4e-9767-2bbdc9d16324" : ""}"
+  dev = "${var.env == "dev" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  qa = "${var.env == "qa" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  uat = "${var.env == "uat" ? "arn:aws:acm:us-east-1:xxx" : ""}"
+  prod = "${var.env == "prod" ? "arn:aws:acm:us-east-1:xxx" : ""}"
   acm = "${coalesce(local.dev, local.qa, local.uat, local.prod)}"
 }
 
 locals{
-  dev1 = "${var.env == "dev" ? "Z03602322VWTWFYJDB6N0" : ""}"
-  qa1 = "${var.env == "qa" ? "Z03697553GJ5S7LZTYWKR" : ""}"
-  uat1 = "${var.env == "uat" ? "Z1011821EEMMUTMM2C02" : ""}"
-  prod1 = "${var.env == "prod" ? "Z10119602Q54AK8H00APS" : ""}"
+  dev1 = "${var.env == "dev" ? "xxx" : ""}"
+  qa1 = "${var.env == "qa" ? "xxx" : ""}"
+  uat1 = "${var.env == "uat" ? "xxx" : ""}"
+  prod1 = "${var.env == "prod" ? "xxx" : ""}"
   zone = "${coalesce(local.dev1, local.qa1, local.uat1, local.prod1)}"
 }
 
@@ -45,7 +45,7 @@ data "aws_iam_policy_document" "assume-policy" {
 }
 
 resource "aws_iam_role" "iam_for_lambda" {
-  name               = "ldi-${var.env}-ui-cf"
+  name               = "project-${var.env}-ui-cf"
   assume_role_policy = "${data.aws_iam_policy_document.assume-policy.json}"
 }
 
@@ -61,7 +61,7 @@ data "aws_iam_policy_document" "s3-access" {
 }
 
 resource "aws_iam_policy" "s3-access" {
-    name = "s3-access_ldi-${var.env}-ui-cf"
+    name = "s3-access_project-${var.env}-ui-cf"
     path = "/"
     policy = data.aws_iam_policy_document.s3-access.json
 }
@@ -73,7 +73,7 @@ resource "aws_iam_role_policy_attachment" "s3-access" {
 
 #----------------------------------------------------------------------------------------------------------------
 resource "aws_s3_bucket" "prod_website" {  
-  bucket = "ldi-${var.env}-ui"
+  bucket = "project-${var.env}-ui"
   force_destroy = true
     acl = "public-read"
     cors_rule {

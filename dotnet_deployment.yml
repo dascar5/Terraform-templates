@@ -1,4 +1,4 @@
-name: ldi-hs-flattener-ca
+name: project-hs-flattener-ca
 
 trigger: none
 pr: none
@@ -52,7 +52,6 @@ stages:
           #     command: 'test'
           #     projects: '**/*Tests*.csproj'
           #     testRunTitle: 'Unit Tests'
-          # result of unit test: https://dev.azure.com/livingstonintl/Livingston%20Digital%20Innovation/_TestManagement/Runs?runId=26610&_a=resultQuery
 
           - task: DotNetCoreCLI@2
             displayName: Publish to $(Build.ArtifactStagingDirectory)

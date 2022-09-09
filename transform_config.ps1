@@ -1,14 +1,3 @@
-<#
-Transform Config files for CodeDeploy Handler
-Author: Colin Kenny
-
-For Any Issues or Inquiries Please Email:
-GSWintel@livingstonintl.com
-CKenny@livingstonintl.com
-
-#>
-
-#Transform Function - Replace Values defined in $Variable_Dict for Current File
 Function XMLConfigTransform
 {
     param(
@@ -40,11 +29,11 @@ $Files = Get-ChildItem -Path ${env:Build_SourcesDirectory}\deployment\* -Include
 
 If ($Build_Environment -ieq "dev")
 {
-    $Account_ARN_REPO = "355754082353"
-    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/lii-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN_REPO = "xxx"
+    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/project-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
 
-    $Account_ARN = "336990213410"
-    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN = "yyy"
+    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
   
 
     $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS_REPO).SecretString | ConvertFrom-Json
@@ -59,13 +48,13 @@ If ($Build_Environment -ieq "dev")
     Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true;isSecret=true]$Build_Environment")
 
     $ECR_Endpoint = "$Account_ARN.dkr.ecr.us-east-1.amazonaws.com"
-    $Target_Repository = (Get-SSMParameterValue -Name "/dev/lii-ldi/ecr/name" -Credential $STS_CREDS).Parameters.Value
+    $Target_Repository = (Get-SSMParameterValue -Name "/dev/project/ecr/name" -Credential $STS_CREDS).Parameters.Value
     $VPCID = (Get-SSMParameterValue -Name "/vpc/dev/id" -Credential $STS_CREDS).Parameters.Value
     $VPCE = (Get-SSMParameterValue -Name "/ldi/dev/apig/vpce" -Credential $STS_CREDS).Parameters.Value
     $Data1 = (Get-SSMParameterValue -Name "/vpc/dev/subnet/datasubnet1/id" -Credential $STS_CREDS).Parameters.Value
     $Data2 = (Get-SSMParameterValue -Name "/vpc/dev/subnet/datasubnet2/id" -Credential $STS_CREDS).Parameters.Value
     
-    $Image = "$ECR_Endpoint/$Target_Repository`:lii-ldi-process--$Build_Environment-${env:Build_BuildID}"
+    $Image = "$ECR_Endpoint/$Target_Repository`:project-process--$Build_Environment-${env:Build_BuildID}"
     Write-Host $Image
 
     Write-Host ("##vso[task.setvariable variable=ECR_Endpoint;isOutput=true]$ECR_Endpoint")
@@ -85,7 +74,7 @@ If ($Build_Environment -ieq "dev")
     $Env_Var.Add("{environment}", $Build_Environment)
     $Env_Var.Add("{aws_access_key}", $Shared_ADO_Conn.AccessKeyID)
     $Env_Var.Add("{aws_secret_key}", $Shared_ADO_Conn.SecretAccessKey)
-    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role")
+    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role")
     $Env_Var.Add("{vpcid}", $VPCID)
     $Env_Var.Add("{vpce}", $VPCE)
     $Env_Var.Add("{Data1}", $Data1)
@@ -96,11 +85,11 @@ If ($Build_Environment -ieq "dev")
 
 If ($Build_Environment -ieq "qa")
 {
-    $Account_ARN_REPO = "355754082353"
-    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/lii-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN_REPO = "xxx"
+    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/project-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
 
-    $Account_ARN = "336990213410"
-    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN = "yyy"
+    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
   
 
     $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS_REPO).SecretString | ConvertFrom-Json
@@ -115,13 +104,13 @@ If ($Build_Environment -ieq "qa")
     Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true;isSecret=true]$Build_Environment")
 
     $ECR_Endpoint = "$Account_ARN.dkr.ecr.us-east-1.amazonaws.com"
-    $Target_Repository = (Get-SSMParameterValue -Name "/qa/lii-ldi/ecr/name" -Credential $STS_CREDS).Parameters.Value
+    $Target_Repository = (Get-SSMParameterValue -Name "/qa/project/ecr/name" -Credential $STS_CREDS).Parameters.Value
     $VPCID = (Get-SSMParameterValue -Name "/vpc/qa/id" -Credential $STS_CREDS).Parameters.Value
     $VPCE = (Get-SSMParameterValue -Name "/ldi/dev/apig/vpce" -Credential $STS_CREDS).Parameters.Value
     $Data1 = (Get-SSMParameterValue -Name "/vpc/qa/subnet/datasubnet1/id" -Credential $STS_CREDS).Parameters.Value
     $Data2 = (Get-SSMParameterValue -Name "/vpc/qa/subnet/datasubnet2/id" -Credential $STS_CREDS).Parameters.Value
     
-    $Image = "$ECR_Endpoint/$Target_Repository`:lii-ldi-process--$Build_Environment-${env:Build_BuildID}"
+    $Image = "$ECR_Endpoint/$Target_Repository`:project-process--$Build_Environment-${env:Build_BuildID}"
     Write-Host $Image
 
     Write-Host ("##vso[task.setvariable variable=ECR_Endpoint;isOutput=true]$ECR_Endpoint")
@@ -141,7 +130,7 @@ If ($Build_Environment -ieq "qa")
     $Env_Var.Add("{environment}", $Build_Environment)
     $Env_Var.Add("{aws_access_key}", $Shared_ADO_Conn.AccessKeyID)
     $Env_Var.Add("{aws_secret_key}", $Shared_ADO_Conn.SecretAccessKey)
-    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role")
+    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role")
     $Env_Var.Add("{vpcid}", $VPCID)
     $Env_Var.Add("{vpce}", $VPCE)
     $Env_Var.Add("{Data1}", $Data1)
@@ -152,11 +141,11 @@ If ($Build_Environment -ieq "qa")
 
 If ($Build_Environment -ieq "uat")
 {
-    $Account_ARN_REPO = "355754082353"
-    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/lii-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN_REPO = "xxx"
+    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/project-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
 
     $Account_ARN = "711237182968"
-    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
   
 
     $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS_REPO).SecretString | ConvertFrom-Json
@@ -171,13 +160,13 @@ If ($Build_Environment -ieq "uat")
     Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true;isSecret=true]$Build_Environment")
 
     $ECR_Endpoint = "$Account_ARN.dkr.ecr.us-east-1.amazonaws.com"
-    $Target_Repository = (Get-SSMParameterValue -Name "/uat/lii-ldi/ecr/name" -Credential $STS_CREDS).Parameters.Value
+    $Target_Repository = (Get-SSMParameterValue -Name "/uat/project/ecr/name" -Credential $STS_CREDS).Parameters.Value
     $VPCID = (Get-SSMParameterValue -Name "/vpc/uat/id" -Credential $STS_CREDS).Parameters.Value
     $VPCE = (Get-SSMParameterValue -Name "/ldi/dev/apig/vpce" -Credential $STS_CREDS).Parameters.Value
     $Data1 = (Get-SSMParameterValue -Name "/vpc/uat/subnet/datasubnet1/id" -Credential $STS_CREDS).Parameters.Value
     $Data2 = (Get-SSMParameterValue -Name "/vpc/uat/subnet/datasubnet2/id" -Credential $STS_CREDS).Parameters.Value
     
-    $Image = "$ECR_Endpoint/$Target_Repository`:lii-ldi-process--$Build_Environment-${env:Build_BuildID}"
+    $Image = "$ECR_Endpoint/$Target_Repository`:project-process--$Build_Environment-${env:Build_BuildID}"
     Write-Host $Image
 
     Write-Host ("##vso[task.setvariable variable=ECR_Endpoint;isOutput=true]$ECR_Endpoint")
@@ -197,7 +186,7 @@ If ($Build_Environment -ieq "uat")
     $Env_Var.Add("{environment}", $Build_Environment)
     $Env_Var.Add("{aws_access_key}", $Shared_ADO_Conn.AccessKeyID)
     $Env_Var.Add("{aws_secret_key}", $Shared_ADO_Conn.SecretAccessKey)
-    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role")
+    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role")
     $Env_Var.Add("{vpcid}", $VPCID)
     $Env_Var.Add("{vpce}", $VPCE)
     $Env_Var.Add("{Data1}", $Data1)
@@ -208,11 +197,11 @@ If ($Build_Environment -ieq "uat")
 
 If ($Build_Environment -ieq "prod")
 {
-    $Account_ARN_REPO = "355754082353"
-    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/lii-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $Account_ARN_REPO = "xxx"
+    $STS_CREDS_REPO = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN_REPO`:role/project-shared-repo-deployment-role" -RoleSessionName "ldi-$Build_Environment-repo-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
 
     $Account_ARN = "711237182968"
-    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
+    $STS_CREDS = (Use-STSRole -RoleArn "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role" -RoleSessionName "lii-$Build_Environment-role" -AccessKey ${env:AccessKey} -SecretKey ${env:SecretKey}).Credentials
   
 
     $TF_Org = (Get-SECSecretValue -SecretID "/shared/tf_org/api" -Credential $STS_CREDS_REPO).SecretString | ConvertFrom-Json
@@ -227,13 +216,13 @@ If ($Build_Environment -ieq "prod")
     Write-Host ("##vso[task.setvariable variable=Build_Environment;isOutput=true;isSecret=true]$Build_Environment")
 
     $ECR_Endpoint = "$Account_ARN.dkr.ecr.us-east-1.amazonaws.com"
-    $Target_Repository = (Get-SSMParameterValue -Name "/uat/lii-ldi/ecr/name" -Credential $STS_CREDS).Parameters.Value
+    $Target_Repository = (Get-SSMParameterValue -Name "/uat/project/ecr/name" -Credential $STS_CREDS).Parameters.Value
     $VPCID = (Get-SSMParameterValue -Name "/vpc/uat/id" -Credential $STS_CREDS).Parameters.Value
     $VPCE = (Get-SSMParameterValue -Name "/ldi/dev/apig/vpce" -Credential $STS_CREDS).Parameters.Value
     $Data1 = (Get-SSMParameterValue -Name "/vpc/uat/subnet/datasubnet1/id" -Credential $STS_CREDS).Parameters.Value
     $Data2 = (Get-SSMParameterValue -Name "/vpc/uat/subnet/datasubnet2/id" -Credential $STS_CREDS).Parameters.Value
     
-    $Image = "$ECR_Endpoint/$Target_Repository`:lii-ldi-process--$Build_Environment-${env:Build_BuildID}"
+    $Image = "$ECR_Endpoint/$Target_Repository`:project-process--$Build_Environment-${env:Build_BuildID}"
     Write-Host $Image
 
     Write-Host ("##vso[task.setvariable variable=ECR_Endpoint;isOutput=true]$ECR_Endpoint")
@@ -253,7 +242,7 @@ If ($Build_Environment -ieq "prod")
     $Env_Var.Add("{environment}", $Build_Environment)
     $Env_Var.Add("{aws_access_key}", $Shared_ADO_Conn.AccessKeyID)
     $Env_Var.Add("{aws_secret_key}", $Shared_ADO_Conn.SecretAccessKey)
-    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/lii-shared-repo-deployment-role")
+    $Env_Var.Add("{aws_role_arn}", "arn:aws:iam::$Account_ARN`:role/project-shared-repo-deployment-role")
     $Env_Var.Add("{vpcid}", $VPCID)
     $Env_Var.Add("{vpce}", $VPCE)
     $Env_Var.Add("{Data1}", $Data1)

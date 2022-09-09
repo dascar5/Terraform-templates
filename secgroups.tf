@@ -1,5 +1,5 @@
 resource "aws_security_group" "alb" {
-  name = "ldi-app-security-group-alb-${var.env}-${substr(uuid(), 0, 3)}"
+  name = "project-app-security-group-alb-${var.env}-${substr(uuid(), 0, 3)}"
   description = "alb"
   vpc_id      = "${var.vpcid}"
 
@@ -42,7 +42,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "container" {
-  name = "ldi-app-security-group-container-${var.env}-${substr(uuid(), 0, 3)}"
+  name = "project-app-security-group-container-${var.env}-${substr(uuid(), 0, 3)}"
   description = "container"
   vpc_id      = "${var.vpcid}"
 
@@ -75,25 +75,25 @@ resource "aws_security_group" "container" {
 }
 
 resource "aws_ssm_parameter" "container_sg_id" {
-  name  = "/ldi/${var.env}/app_cluster/container_sg"
+  name  = "/project/${var.env}/app_cluster/container_sg"
   type  = "String"
   value = aws_security_group.container.id
 }
 
 resource "aws_ssm_parameter" "alb_sg_id" {
-  name  = "/ldi/${var.env}/app_cluster/alb_sg"
+  name  = "/project/${var.env}/app_cluster/alb_sg"
   type  = "String"
   value = aws_security_group.alb.id
 }
 
 data "aws_ssm_parameter" "ui_sg_alb_id" {
-  name = "/ldi/${var.env}/ui_cluster/alb_sg"
+  name = "/project/${var.env}/ui_cluster/alb_sg"
 }
 
 data "aws_ssm_parameter" "ui_sg_container_id" {
-  name = "/ldi/${var.env}/ui_cluster/container_sg"
+  name = "/project/${var.env}/ui_cluster/container_sg"
 }
 
 data "aws_ssm_parameter" "searchwatch_sg" {
-  name = "/ldi/${var.env}/searchwatch/lambda_sg"
+  name = "/project/${var.env}/searchwatch/lambda_sg"
 }

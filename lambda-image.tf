@@ -1,18 +1,18 @@
 
 data "aws_secretsmanager_secret_version" "creds" {
-  secret_id = "${var.env}/ldi-mult-desc-srch-process/RDS"
+  secret_id = "${var.env}/project-mult-desc-srch-process/RDS"
 }
 
 data "aws_ssm_parameter" "hostname" {
-  name = "/ldi/rds/${var.env}/hostname"
+  name = "/project/rds/${var.env}/hostname"
 }
 
 data "aws_ssm_parameter" "bucket_name" {
-  name = "/ldi/bucket/${var.env}/name"
+  name = "/project/bucket/${var.env}/name"
 }
 
 data "aws_ssm_parameter" "upc_arn" {
-  name = "/lii-ldi/${var.env}/lambda/upcservice/arn"
+  name = "/lii-project/${var.env}/lambda/upcservice/arn"
 }
 
 locals {
@@ -26,7 +26,7 @@ locals{
 }
 
 resource "aws_lambda_function" "lambda" {
-  function_name = "ldi-${var.env}-multi-desc-search-process"
+  function_name = "project-${var.env}-multi-desc-search-process"
   role          = aws_iam_role.iam_for_lambda.arn
   memory_size = 4096
   timeout = 300

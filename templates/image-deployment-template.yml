@@ -2,16 +2,16 @@ steps:
   - checkout: none
 
   - download: current
-    artifact: LDITransformArtifacts
+    artifact: TransformArtifacts
     name: download_transform
 
   - task: ArchiveFiles@2
     inputs:
-      rootFolderOrFile: $(Pipeline.Workspace)/LDITransformArtifacts/deployment
+      rootFolderOrFile: $(Pipeline.Workspace)/TransformArtifacts/deployment
       includeRootFolder: false
       archiveType: 'tar'
       tarCompression: 'gz'
-      archiveFile: $(Pipeline.Workspace)/LDITransformArtifacts/deployment/deployment_package.tar.gz
+      archiveFile: $(Pipeline.Workspace)/TransformArtifacts/deployment/deployment_package.tar.gz
       verbose: True
     displayName: 'Create Deploy Package'
     name: archive
@@ -35,7 +35,7 @@ steps:
             $TF_Org_Key = $TF_Org.key
             $TF_Team_Key = $TF_Team.key
 
-            $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Pipeline.Workspace)/LDITransformArtifacts/deployment/deployment_package.tar.gz" -Encoding byte))
+            $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Pipeline.Workspace)/TransformArtifacts/deployment/deployment_package.tar.gz" -Encoding byte))
             $Payload ="{ ""workspace"": ""ldi-mult-desc-srch-process-$Build_Environment"", ""deploy_package"": ""$Encoded_Archive"", ""tf_org"": ""$TF_Org_Key"", ""tf_team"": ""$TF_Team_Key"" }"
             
             $EncodedPayloadBytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
@@ -66,7 +66,7 @@ steps:
                 ContentType="application/vnd.api+json"
             }
 
-            $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/livingston-international/workspaces/ldi-mult-desc-srch-process-$env:BUILD_ENVIRONMENT" -Headers $Headers
+            $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/org/workspaces/ldi-mult-desc-srch-process-$env:BUILD_ENVIRONMENT" -Headers $Headers
 
             If ($Response -ine $null)
             {

@@ -1,7 +1,7 @@
 module "db" {
   source  = "terraform-aws-modules/rds/aws"
 
-  identifier = "lii-gdm-ms-${var.env}-rds-integration-cluster"
+  identifier = "project-${var.env}-rds-integration-cluster"
 
   engine            = "postgres"
   engine_version    = "14.1"
@@ -33,7 +33,7 @@ module "db" {
   backup_window = "03:00-06:00"
 
   monitoring_interval = "30"
-  monitoring_role_name = "lii-gdm-ms-${var.env}-rds-integration-cluster-monitoring"
+  monitoring_role_name = "project-${var.env}-rds-integration-cluster-monitoring"
   create_monitoring_role = true
 
   deletion_protection = false

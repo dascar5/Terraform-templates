@@ -1,14 +1,14 @@
 
-resource "aws_ecr_repository" "lii-ldi-shared-ecr" {
-  name                 = "lii-ldi-shared-ecr-${var.env}"
+resource "aws_ecr_repository" "project-shared-ecr" {
+  name                 = "project-shared-ecr-${var.env}"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 }
 
-resource "aws_ecr_repository_policy" "lii-ldi-shared-ecr-policy" {
-  repository = aws_ecr_repository.lii-ldi-shared-ecr.name
+resource "aws_ecr_repository_policy" "project-shared-ecr-policy" {
+  repository = aws_ecr_repository.project-shared-ecr.name
 
   policy = <<EOF
 {
@@ -33,8 +33,8 @@ resource "aws_ecr_repository_policy" "lii-ldi-shared-ecr-policy" {
 EOF
 }
 
-resource "aws_ssm_parameter" "lii-ldi-shared-ecr-param" {
-  name  = "/${var.env}/lii-ldi/ecr/name"
+resource "aws_ssm_parameter" "project-shared-ecr-param" {
+  name  = "/${var.env}/project/ecr/name"
   type  = "String"
-  value = aws_ecr_repository.lii-ldi-shared-ecr.name
+  value = aws_ecr_repository.project-shared-ecr.name
 }

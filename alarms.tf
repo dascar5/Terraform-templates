@@ -1,6 +1,6 @@
 resource "aws_appautoscaling_target" "scale_target" {
   service_namespace  = "ecs"
-  resource_id        = "service/lii-gdm-ms-${var.env}-cluster/lii-gdm-ms-${var.env}-inbound-ecs-service"
+  resource_id        = "service/project-${var.env}-cluster/project-${var.env}-inbound-ecs-service"
   scalable_dimension = "ecs:service:DesiredCount"
   min_capacity       = "1"
   max_capacity       = "2"
@@ -11,10 +11,10 @@ resource "aws_appautoscaling_target" "scale_target" {
 }
 
 resource "aws_appautoscaling_policy" "scale_up_policy" {
-  name               = "lii-gdm-ms-${var.env}-inbound-scale-up-policy"
+  name               = "project-${var.env}-inbound-scale-up-policy"
   depends_on         = [aws_appautoscaling_target.scale_target]
   service_namespace  = "ecs"
-  resource_id        = "service/lii-gdm-ms-${var.env}-cluster/lii-gdm-ms-${var.env}-inbound-ecs-service"
+  resource_id        = "service/project-${var.env}-cluster/project-${var.env}-inbound-ecs-service"
   scalable_dimension = "ecs:service:DesiredCount"
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -28,10 +28,10 @@ resource "aws_appautoscaling_policy" "scale_up_policy" {
 }
 
 resource "aws_appautoscaling_policy" "scale_down_policy" {
-  name               = "lii-gdm-ms-${var.env}-inbound-scale-down-policy"
+  name               = "project-${var.env}-inbound-scale-down-policy"
   depends_on         = [aws_appautoscaling_target.scale_target]
   service_namespace  = "ecs"
-  resource_id        = "service/lii-gdm-ms-${var.env}-cluster/lii-gdm-ms-${var.env}-inbound-ecs-service"
+  resource_id        = "service/project-${var.env}-cluster/project-${var.env}-inbound-ecs-service"
   scalable_dimension = "ecs:service:DesiredCount"
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -45,7 +45,7 @@ resource "aws_appautoscaling_policy" "scale_down_policy" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_high" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-cpu-high"
+  alarm_name          = "project-${var.env}-inbound-cpu-high"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = "1"
   metric_name         = "CPUUtilization"
@@ -54,14 +54,14 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   statistic           = "Maximum"
   threshold           = "75"
   dimensions = {
-    ClusterName = "lii-gdm-ms-${var.env}-cluster"
-    ServiceName = "lii-gdm-ms-${var.env}-inbound-ecs-service"
+    ClusterName = "project-${var.env}-cluster"
+    ServiceName = "project-${var.env}-inbound-ecs-service"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_up_policy.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_low" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-cpu-low"
+  alarm_name          = "project-${var.env}-inbound-cpu-low"
   comparison_operator = "LessThanOrEqualToThreshold"
   evaluation_periods  = "1"
   metric_name         = "CPUUtilization"
@@ -70,14 +70,14 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
   statistic           = "Average"
   threshold           = "15"
   dimensions = {
-    ClusterName = "lii-gdm-ms-${var.env}-cluster"
-    ServiceName = "lii-gdm-ms-${var.env}-inbound-ecs-service"
+    ClusterName = "project-${var.env}-cluster"
+    ServiceName = "project-${var.env}-inbound-ecs-service"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_down_policy.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "messages_not_visible" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-messages_not_visible_q2"
+  alarm_name          = "project-${var.env}-inbound-messages_not_visible_q2"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = "2"
   metric_name         = "ApproximateNumberOfMessagesNotVisible"
@@ -88,13 +88,13 @@ resource "aws_cloudwatch_metric_alarm" "messages_not_visible" {
   datapoints_to_alarm = 2
   treat_missing_data  = "missing"
   dimensions = {
-    QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q2.fifo"
+    QueueName = "project-${var.env}-inbound-sqs-q2.fifo"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_down_policy.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "messages_not_visible1" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-messages_not_visible_q1"
+  alarm_name          = "project-${var.env}-inbound-messages_not_visible_q1"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = "2"
   metric_name         = "ApproximateNumberOfMessagesNotVisible"
@@ -105,13 +105,13 @@ resource "aws_cloudwatch_metric_alarm" "messages_not_visible1" {
   datapoints_to_alarm = 2
   treat_missing_data  = "missing"
   dimensions = {
-    QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q1.fifo"
+    QueueName = "project-${var.env}-inbound-sqs-q1.fifo"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_down_policy.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "messages_visible" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-messages_visible_q2"
+  alarm_name          = "project-${var.env}-inbound-messages_visible_q2"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = "2"
   metric_name         = "ApproximateNumberOfMessagesVisible"
@@ -122,13 +122,13 @@ resource "aws_cloudwatch_metric_alarm" "messages_visible" {
   datapoints_to_alarm = 2
   treat_missing_data  = "missing"
   dimensions = {
-    QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q2.fifo"
+    QueueName = "project-${var.env}-inbound-sqs-q2.fifo"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_up_policy.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "messages_visible1" {
-  alarm_name          = "lii-gdm-ms-${var.env}-inbound-messages_visible_q1"
+  alarm_name          = "project-${var.env}-inbound-messages_visible_q1"
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = "2"
   metric_name         = "ApproximateNumberOfMessagesVisible"
@@ -139,7 +139,7 @@ resource "aws_cloudwatch_metric_alarm" "messages_visible1" {
   datapoints_to_alarm = 2
   treat_missing_data  = "missing"
   dimensions = {
-    QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q1.fifo"
+    QueueName = "project-${var.env}-inbound-sqs-q1.fifo"
   }
   alarm_actions = [aws_appautoscaling_policy.scale_up_policy.arn]
 }
@@ -148,7 +148,7 @@ resource "aws_cloudwatch_metric_alarm" "messages_visible1" {
 #   source  = "terraform-aws-modules/cloudwatch/aws//modules/metric-alarms-by-multiple-dimensions"
 #   version = "~> 3.0"
 
-#   alarm_name          = "lii-gdm-ms-${var.env}-inbound-messages_not_visible"
+#   alarm_name          = "project-${var.env}-inbound-messages_not_visible"
 #   comparison_operator = "LessThanThreshold"
 #   evaluation_periods  = 2
 #   threshold           = 1
@@ -162,10 +162,10 @@ resource "aws_cloudwatch_metric_alarm" "messages_visible1" {
 
 #   dimensions = {
 #     "q1" = {
-#       QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q1.fifo"
+#       QueueName = "project-${var.env}-inbound-sqs-q1.fifo"
 #     },
 #     "q2" = {
-#       QueueName = "lii-gdm-ms-${var.env}-inbound-sqs-q2.fifo"
+#       QueueName = "project-${var.env}-inbound-sqs-q2.fifo"
 #     },
 #   }
 

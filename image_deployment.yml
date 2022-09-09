@@ -11,12 +11,12 @@ stages:
           pool: 
             vmImage: 'windows-2022'
           steps:
-          - checkout: git://Livingston Digital Innovation/lii-ldi-shared-ecr@$(System.PullRequest.TargetBranch)
+          - checkout: git://xxx Project/project-shared-ecr@$(System.PullRequest.TargetBranch)
           - checkout: self
           - task: AWSPowerShellModuleScript@1
             inputs:
                 regionName: 'us-east-1'
-                filePath: '$(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/transform_config.ps1'
+                filePath: '$(Agent.BuildDirectory)/s/project-shared-ecr/deployment/transform_config.ps1'
                 awsCredentials: 'LDI CI/CD Role'
                 arguments: "-Is_Remote_Repo 'True'"
             displayName: 'Variable Transformation'
@@ -24,11 +24,11 @@ stages:
 
           - task: ArchiveFiles@2
             inputs:
-              rootFolderOrFile: $(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/
+              rootFolderOrFile: $(Agent.BuildDirectory)/s/project-shared-ecr/deployment/
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
-              archiveFile: $(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/deployment_package.tar.gz
+              archiveFile: $(Agent.BuildDirectory)/s/project-shared-ecr/deployment/deployment_package.tar.gz
               verbose: True
             displayName: 'Create Deploy Package'
             name: archive
@@ -52,8 +52,8 @@ stages:
                     $TF_Org_Key = $TF_Org.key
                     $TF_Team_Key = $TF_Team.key
 
-                    $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Agent.BuildDirectory)/s/lii-ldi-shared-ecr/deployment/deployment_package.tar.gz" -Encoding byte))
-                    $Payload ="{ ""workspace"": ""lii-ldi-shared-ecr-$Build_Environment"", ""deploy_package"": ""$Encoded_Archive"", ""tf_org"": ""$TF_Org_Key"", ""tf_team"": ""$TF_Team_Key"" }"
+                    $Encoded_Archive = [convert]::ToBase64String((Get-Content -path "$(Agent.BuildDirectory)/s/project-shared-ecr/deployment/deployment_package.tar.gz" -Encoding byte))
+                    $Payload ="{ ""workspace"": ""project-shared-ecr-$Build_Environment"", ""deploy_package"": ""$Encoded_Archive"", ""tf_org"": ""$TF_Org_Key"", ""tf_team"": ""$TF_Team_Key"" }"
                     
                     $EncodedPayloadBytes = [System.Text.Encoding]::UTF8.GetBytes($Payload)
                     $EncodedPayload = [System.Convert]::ToBase64String($EncodedPayloadBytes)
@@ -83,7 +83,7 @@ stages:
                         ContentType="application/vnd.api+json"
                     }
 
-                    $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/livingston-international/workspaces/lii-ldi-shared-ecr-$env:BUILD_ENVIRONMENT" -Headers $Headers
+                    $Response = Invoke-RestMethod -Method Get -Uri "https://app.terraform.io/api/v2/organizations/xxx-international/workspaces/project-shared-ecr-$env:BUILD_ENVIRONMENT" -Headers $Headers
 
                     If ($Response -ine $null)
                     {
@@ -198,7 +198,7 @@ stages:
                 Dockerfile: '$(Pipeline.Workspace)/LDITransformArtifacts/Dockerfile'
                 addPipelineData: true
                 tags: |
-                  lii-ldi-process--$(Build_Environment)-$(Build.BuildId)
+                  project-process--$(Build_Environment)-$(Build.BuildId)
 
     - stage: SetEnvStage
       dependsOn:

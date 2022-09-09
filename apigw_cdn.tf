@@ -1,27 +1,27 @@
 #dev domain
 resource "aws_api_gateway_domain_name" "dev-domain" {
   count = length(regexall("dev", var.env)) > 0 ? 1 : 0
-  domain_name = "ldi-apig.dev.mlnonprod.liiaws.net"
-  certificate_arn = "arn:aws:acm:us-east-1:336990213410:certificate/3da0109f-6da2-4f6a-a5c8-fccef7c3e09b"
+  domain_name = "project-apig.dev.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:xxx"
 }
 
 #qa domain
 resource "aws_api_gateway_domain_name" "qa-domain" {
   count = length(regexall("dev", var.env)) > 0 ? 1 : 0
-  domain_name = "ldi-apig.qa.mlnonprod.liiaws.net"
-  certificate_arn = "arn:aws:acm:us-east-1:336990213410:certificate/8952549e-cd55-47e9-b636-e9c76f1610e9"
+  domain_name = "project-apig.qa.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:xxx"
 }
 
 resource "aws_api_gateway_domain_name" "uat-domain" {
   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
-  domain_name = "ldi-apig.uat.mlnonprod.liiaws.net"
-  certificate_arn = "arn:aws:acm:us-east-1:711237182968:certificate/578d8f8e-6445-4574-ae6e-8c0f3bd8ef91"
+  domain_name = "project-apig.uat.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:xxx"
 }
 
 resource "aws_api_gateway_domain_name" "prod-domain" {
   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
-  domain_name = "ldi-apig.prod.mlnonprod.liiaws.net"
-  certificate_arn = "arn:aws:acm:us-east-1:711237182968:certificate/6b2a5e83-f9ee-4e4e-9767-2bbdc9d16324"
+  domain_name = "project-apig.prod.mlnonprod.liiaws.net"
+  certificate_arn = "arn:aws:acm:us-east-1:xxx"
 }
 
 
@@ -30,7 +30,7 @@ resource "aws_route53_record" "dev-record" {
   count = length(regexall("dev", var.env)) > 0 ? 1 : 0
   name    = aws_api_gateway_domain_name.dev-domain[count.index].domain_name
   type    = "A"
-  zone_id = "Z03602322VWTWFYJDB6N0"
+  zone_id = "xxx"
 
   alias {
     evaluate_target_health = true
@@ -43,7 +43,7 @@ resource "aws_route53_record" "qa-record" {
   count = length(regexall("dev", var.env)) > 0 ? 1 : 0
   name    = aws_api_gateway_domain_name.qa-domain[count.index].domain_name
   type    = "A"
-  zone_id = "Z03697553GJ5S7LZTYWKR"
+  zone_id = "xxx"
 
   alias {
     evaluate_target_health = true
@@ -56,7 +56,7 @@ resource "aws_route53_record" "uat-record" {
   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
   name    = aws_api_gateway_domain_name.uat-domain[count.index].domain_name
   type    = "A"
-  zone_id = "Z1011821EEMMUTMM2C02"
+  zone_id = "xxx"
 
   alias {
     evaluate_target_health = true
@@ -69,7 +69,7 @@ resource "aws_route53_record" "prod-record" {
   count = length(regexall("uat", var.env)) > 0 ? 1 : 0
   name    = aws_api_gateway_domain_name.prod-domain[count.index].domain_name
   type    = "A"
-  zone_id = "Z10119602Q54AK8H00APS"
+  zone_id = "xxx"
 
   alias {
     evaluate_target_health = true
@@ -79,7 +79,7 @@ resource "aws_route53_record" "prod-record" {
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_downloader" {
-  name = "ldi-hs-file-downloader-ca-apig"
+  name = "project-hs-file-downloader-ca-apig"
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -120,13 +120,13 @@ resource "aws_api_gateway_base_path_mapping" "apig_downloader-prod" {
 }
 
 resource "aws_ssm_parameter" "apig_downloader" {
-  name  = "/lii-ldi/${var.env}/api/hs-file-downloader-ca/APIId"
+  name  = "/lii-project/${var.env}/api/hs-file-downloader-ca/APIId"
   type  = "String"
   value = aws_api_gateway_rest_api.apig_downloader.id
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_searchterm" {
-  name = "ldi-searchterm-apig"
+  name = "project-searchterm-apig"
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -167,13 +167,13 @@ resource "aws_api_gateway_base_path_mapping" "apig_searchterm-prod" {
 }
 
 resource "aws_ssm_parameter" "apig_searchterm" {
-  name  = "/lii-ldi/${var.env}/api/search-term/APIId"
+  name  = "/lii-project/${var.env}/api/search-term/APIId"
   type  = "String"
   value = aws_api_gateway_rest_api.apig_searchterm.id
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_process" {
-  name = "ldi-multi-description-search-apig"
+  name = "project-multi-description-search-apig"
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -214,13 +214,13 @@ resource "aws_api_gateway_base_path_mapping" "apig_process-prod" {
 }
 
 resource "aws_ssm_parameter" "apig_process" {
-  name  = "/lii-ldi/${var.env}/api/mult-desc-srch-process/APIId"
+  name  = "/lii-project/${var.env}/api/mult-desc-srch-process/APIId"
   type  = "String"
   value = aws_api_gateway_rest_api.apig_process.id
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_searchwatch" {
-  name = "ldi-searchwatch-apig"
+  name = "project-searchwatch-apig"
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -261,13 +261,13 @@ resource "aws_api_gateway_base_path_mapping" "apig_searchwatch-prod" {
 }
 
 resource "aws_ssm_parameter" "apig_searchwatch" {
-  name  = "/lii-ldi/${var.env}/api/searchwatch/APIId"
+  name  = "/lii-project/${var.env}/api/searchwatch/APIId"
   type  = "String"
   value = aws_api_gateway_rest_api.apig_searchwatch.id
 }
 #---------------------------------------------------------------------------------------
 resource "aws_api_gateway_rest_api" "apig_upc" {
-  name = "ldi-upc-service-apig"
+  name = "project-upc-service-apig"
 
   endpoint_configuration {
     types = ["PRIVATE"]
@@ -308,7 +308,7 @@ resource "aws_api_gateway_base_path_mapping" "apig_upc-prod" {
 }
 
 resource "aws_ssm_parameter" "apig_upc" {
-  name  = "/lii-ldi/${var.env}/api/upcservice/APIId"
+  name  = "/lii-project/${var.env}/api/upcservice/APIId"
   type  = "String"
   value = aws_api_gateway_rest_api.apig_upc.id
 }
